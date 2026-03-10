@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  /* Mavros OLED Dark Design System */
+  --color-background: oklch(0.02 0 0);
+  --color-foreground: oklch(0.9 0 0);
+  
+  --color-card: oklch(0.1 0 0);
+  --color-card-foreground: oklch(0.9 0 0);
+  
+  --color-primary: oklch(0.985 0 0);
+  --color-primary-foreground: oklch(0.02 0 0);
+  
+  --color-secondary: oklch(0.1 0 0);
+  --color-secondary-foreground: oklch(0.9 0 0);
+  
+  --color-muted: oklch(0.1 0 0);
+  --color-muted-foreground: oklch(0.6 0 0);
+  
+  --color-accent: oklch(0.577 0.245 27.325);
+  --color-accent-foreground: oklch(0.985 0 0);
+  
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  
+  --color-border: oklch(0.2 0 0);
+  --color-input: oklch(0.1 0 0);
+  --color-ring: oklch(0.4 0 0);
+  
+  --radius: 0.625rem;
+}
+
+body {
+  overflow-x: hidden; /* Evita scroll horizontal indeseado */
+}
+
+/* Ocultar barra de scroll pero permitir navegar (Opcional, estilo Netflix) */
+::-webkit-scrollbar {
+  width: 8px;
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
