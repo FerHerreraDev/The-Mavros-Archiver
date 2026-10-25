@@ -40,8 +40,32 @@ const EXPECTED_TYPES = {
   '.ts': ['video/mp2t'],
 }
 
+// r2.dev limita la velocidad (429) y a veces corta conexiones: reintentar con espera.
+// Si tras los reintentos sigue fallando, se reporta como error (no se ignora).
+async function headWithRetry(url, attempts = 6) {
+  let lastError
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        method: 'HEAD',
+        headers: { Origin: 'http://localhost:3000' },
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.status !== 429 && res.status < 500) return res
+      lastError = `status ${res.status}`
+      const retryAfter = Number(res.headers.get('retry-after'))
+      await new Promise((r) => setTimeout(r, (retryAfter || 2 ** i) * 1000))
+    } catch (err) {
+      lastError = err.cause?.code ?? err.message
+      await new Promise((r) => setTimeout(r, 2 ** i * 1000))
+    }
+  }
+  return lastError
+}
+
 async function checkRemote(url) {
-  const res = await fetch(url, { method: 'HEAD', headers: { Origin: 'http://localhost:3000' } })
+  const res = await headWithRetry(url)
+  if (typeof res === 'string') return `VID-07 ${url}: sin respuesta tras reintentos (${res})`
   const ext = path.extname(new URL(url).pathname)
   const type = (res.headers.get('content-type') ?? '').split(';')[0].toLowerCase()
   const problems = []
@@ -81,7 +105,7 @@ for (const v of variants) {
 const errors = validateLadder(variants, medias, sourceFile ? probeSource(sourceFile) : {})
 
 if (isUrl) {
-  const remote = await pool([masterLocation, ...segmentLocations], 24, checkRemote)
+  const remote = await pool([masterLocation, ...segmentLocations], 6, checkRemote)
   errors.push(...remote.filter(Boolean))
 }
 
