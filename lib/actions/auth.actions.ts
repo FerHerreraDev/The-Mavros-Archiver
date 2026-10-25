@@ -87,13 +87,6 @@ export async function loginAction(formData: FormData) {
       // Mensaje genérico para prevenir user enumeration
       return { error: 'Authentication failed. Please try again.' }
     }
-
-    // Success - revalidate cache and redirect
-    revalidatePath('/', 'layout')
-    
-    // Note: redirect() throws a Next.js error to stop execution
-    // This is intentional behavior, not a bug
-    redirect('/dashboard')
     
   } catch (err) {
     console.error('[AUTH] Unexpected error during login:', err)
@@ -104,6 +97,9 @@ export async function loginAction(formData: FormData) {
     
     return { error: 'An unexpected error occurred. Please try again.' }
   }
+
+  revalidatePath('/', 'layout')
+  redirect('/dashboard')
 }
 
 /**

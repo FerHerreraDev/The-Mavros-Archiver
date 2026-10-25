@@ -7,25 +7,26 @@ import { loginSchema } from '@/lib/validations/auth.schema'
 import { z } from 'zod'
 import Link from 'next/link'
 
-// Constantes fuera del componente para evitar recreación
+// 1. Importamos tus componentes base de Shadcn
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
 const ICON_CLASSES = "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
 
 export function LoginForm() {
-  // useTransition da mejor control que useFormStatus
   const [isPending, startTransition] = useTransition()
-  
-  // Estados para errores
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
 
-  // useCallback evita recrear la función en cada render
+  const [emailValue, setEmailValue] = useState('')
+  const [passwordValue, setPasswordValue] = useState('')
+
   const handleSubmit = useCallback(async (formData: FormData) => {
     startTransition(async () => {
-      // Limpiar errores previos
       setError(null)
       setFieldErrors({})
 
-      // VALIDACIÓN CLIENT-SIDE (feedback inmediato)
       const data = {
         email: formData.get('email'),
         password: formData.get('password'),
@@ -35,68 +36,74 @@ export function LoginForm() {
       if (!validation.success) {
         const flattened = z.flattenError(validation.error)
         setFieldErrors(flattened.fieldErrors)
-        return // Detener aquí si la validación falla
+        return 
       }
 
-      // VALIDACIÓN SERVER-SIDE + autenticación
       try {
         const result = await loginAction(formData)
         if (result?.error) {
           setError(result.error)
         }
-        // Si no hay error, redirect() se ejecuta en el server action
       } catch (err) {
-        // Manejo de errores de red
+        if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
+          throw err; 
+        }
+        console.error('Login error:', err);
         setError('Network error. Please check your connection.')
       }
     })
   }, [])
 
-  // Limpiar errores cuando el usuario empieza a editar
   const clearError = useCallback(() => {
     setError(null)
     setFieldErrors({})
   }, [])
 
+  const isButtonDisabled = isPending || emailValue.trim() === '' || passwordValue.trim() === ''
+
   return (
     <div className="space-y-6">
-      {/* Label */}
       <div className="text-center">
         <span className="text-xs font-mono text-muted-foreground uppercase tracking-wide">
           AUTHENTICATE
         </span>
       </div>
 
-      {/* Error message global */}
       {error && (
         <div className="bg-destructive/10 border border-destructive/50 rounded-lg p-3" role="alert">
           <p className="text-sm text-destructive text-center">{error}</p>
         </div>
       )}
 
-      {/* Form - fieldset deshabilita todos los inputs durante pending */}
       <form action={handleSubmit} className="space-y-4">
         <fieldset disabled={isPending} className="space-y-4">
-          {/* Email field */}
+          
           <div className="space-y-2">
-            <label
+            {/* Usamos <Label> de Shadcn */}
+            <Label
               htmlFor="email"
-              className="text-xs font-mono text-muted-foreground uppercase tracking-wide"
+              className="text-xs font-mono uppercase tracking-wide text-muted-foreground"
             >
               Email
-            </label>
+            </Label>
             <div className="relative">
               <Mail className={ICON_CLASSES} />
-              <input
+              {/* Usamos <Input> de Shadcn */}
+              <Input
                 id="email"
                 name="email"
                 type="email"
                 placeholder="your@email.com"
+                value={emailValue}
                 required
-                onChange={clearError}
+                onChange={(e) => {
+                  setEmailValue(e.target.value)
+                  clearError()
+                }}
                 aria-invalid={!!fieldErrors.email}
                 aria-describedby={fieldErrors.email ? "email-error" : undefined}
-                className="w-full bg-card border border-border rounded-full pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                // Mantenemos solo las clases específicas para este diseño (el padding del ícono y el borde redondo)
+                className="pl-10 pr-4 py-2 bg-card rounded-full h-auto" 
               />
             </div>
             {fieldErrors.email && (
@@ -106,26 +113,31 @@ export function LoginForm() {
             )}
           </div>
 
-          {/* Password field */}
           <div className="space-y-2">
-            <label
+            {/* Usamos <Label> de Shadcn */}
+            <Label
               htmlFor="password"
-              className="text-xs font-mono text-muted-foreground uppercase tracking-wide"
+              className="text-xs font-mono uppercase tracking-wide text-muted-foreground"
             >
               Password
-            </label>
+            </Label>
             <div className="relative">
               <Lock className={ICON_CLASSES} />
-              <input
+              {/* Usamos <Input> de Shadcn */}
+              <Input
                 id="password"
                 name="password"
                 type="password"
                 placeholder="••••••••"
+                value={passwordValue}
                 required
-                onChange={clearError}
+                onChange={(e) => {
+                  setPasswordValue(e.target.value)
+                  clearError()
+                }}
                 aria-invalid={!!fieldErrors.password}
                 aria-describedby={fieldErrors.password ? "password-error" : undefined}
-                className="w-full bg-card border border-border rounded-full pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="pl-10 pr-4 py-2 bg-card rounded-full h-auto"
               />
             </div>
             {fieldErrors.password && (
@@ -135,7 +147,6 @@ export function LoginForm() {
             )}
           </div>
 
-          {/* Forgot password link */}
           <div className="text-right">
             <Link
               href="/forgot-password"
@@ -146,21 +157,20 @@ export function LoginForm() {
             </Link>
           </div>
 
-          {/* Submit button */}
-          <button
+          {/* Usamos <Button> de Shadcn */}
+          <Button
             type="submit"
-            disabled={isPending}
-            className="w-full bg-primary text-primary-foreground rounded-full px-5 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isButtonDisabled}
+            className="w-full rounded-full font-semibold py-5" // py-5 para mantener la altura que tenías originalmente
           >
             {isPending ? 'Authenticating...' : 'Sign In'}
-          </button>
+          </Button>
         </fieldset>
       </form>
 
-      {/* Access info */}
       <div className="text-center">
         <p className="text-sm text-muted-foreground">
-          Don't have access?{' '}
+          Don&apos;t have access?{' '}
           <span className="text-foreground font-semibold">
             Contact your administrator
           </span>
