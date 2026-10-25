@@ -255,3 +255,23 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | PRG-03 | RLS: cada usuario solo lee y escribe **su** progreso; no puede leer ni escribir el de otro ni a nombre de otro. Anónimos nada. |
 | PRG-04 | Solo se puede guardar progreso de películas que el usuario puede ver (no de borradores ajenos); la posición está entre 0 y la duración de la película. |
 | PRG-05 | Hay un solo registro por usuario y película (guardar otra vez lo actualiza); borrar la película o el usuario borra su progreso. |
+
+## Fase 6 — Producción
+
+### Rate limit
+
+| ID | Requisito |
+|---|---|
+| OPS-01 | El límite de intentos (login, recuperación, invitaciones, elegir contraseña) se cuenta en la base de datos, así que se respeta aunque la app corra en varias instancias (Vercel). Mismos límites que AUTH-04: 5 por minuto por clave. |
+| OPS-02 | Contar es atómico: muchos intentos simultáneos no pueden pasar del límite. Si el contador no está disponible, la acción se bloquea (falla cerrado), nunca deja pasar sin contar. |
+| OPS-03 | Solo el servidor puede usar el contador: ni anónimos ni usuarios pueden llamarlo, leerlo ni reiniciarlo desde el cliente. |
+| OPS-04 | La IP del cliente se toma del header que pone la plataforma (`x-vercel-forwarded-for`, `x-real-ip`) o del **primer** valor de `x-forwarded-for`; valores agregados por el cliente detrás no cambian la clave. |
+
+### Páginas y headers
+
+| ID | Requisito |
+|---|---|
+| OPS-05 | Una ruta inexistente muestra una página 404 propia con enlace de vuelta, con el estilo de la app. |
+| OPS-06 | Un error inesperado en el dashboard muestra una página de error propia con "Reintentar", sin filtrar detalles técnicos al usuario. |
+| OPS-07 | Todas las respuestas llevan headers de seguridad: no se puede incrustar la app en un iframe (`X-Frame-Options: DENY` y `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restrictiva y HSTS. |
+| OPS-08 | Next 16: el control de rutas usa la convención `proxy` (no la obsoleta `middleware`), con el mismo comportamiento (ACC-01..ACC-06 siguen pasando). |

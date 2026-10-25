@@ -1,12 +1,22 @@
+import { Suspense } from 'react'
 import { Film } from 'lucide-react'
 import { getCatalog } from '@/lib/data/catalog'
 import { MovieCard } from '@/components/catalog/movie-card'
 import { GenreFilter } from '@/components/catalog/genre-filter'
+import { CatalogSkeleton } from '@/components/catalog/catalog-skeleton'
 
 const GRID = 'grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ genre?: string }> }) {
   const { genre } = await searchParams
+  return (
+    <Suspense key={genre ?? ''} fallback={<CatalogSkeleton />}>
+      <Catalog genre={genre} />
+    </Suspense>
+  )
+}
+
+async function Catalog({ genre }: { genre?: string }) {
   const { genres, recent, continueWatching } = await getCatalog(genre)
 
   return (

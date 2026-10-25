@@ -8,7 +8,7 @@ import {
 } from '@/lib/actions/admin.actions'
 import { listUsersForAdmin } from '@/lib/data/admin-users'
 import { GET as confirmGET } from '@/app/auth/confirm/route'
-import { middleware } from '@/middleware'
+import { proxy } from '@/proxy'
 import { resetRequest, runAndCaptureRedirect, formData } from '../helpers/request-context'
 import {
   adminClient,
@@ -232,7 +232,7 @@ describe('ADM-09 / ADM-10 / ADM-11 desactivar y reactivar', () => {
     expect(await canLogin(target)).toBe(false)
 
     // Con las cookies de la sesión que ya tenía abierta
-    const res = await middleware(
+    const res = await proxy(
       new NextRequest(`${E2E_BASE_URL}/dashboard`, { headers: { cookie: openSession.toHeader() } })
     )
     expect(new URL(res.headers.get('location') ?? `${E2E_BASE_URL}/dashboard`).pathname).toBe('/login')
@@ -274,7 +274,7 @@ describe('ADM-09 / ADM-10 / ADM-11 desactivar y reactivar', () => {
     await setUserActiveAction({ userId: target.id, active: false })
     await setUserActiveAction({ userId: target.id, active: true })
 
-    const res = await middleware(
+    const res = await proxy(
       new NextRequest(`${E2E_BASE_URL}/dashboard`, { headers: { cookie: openSession.toHeader() } })
     )
     expect(new URL(res.headers.get('location') ?? `${E2E_BASE_URL}/dashboard`).pathname).toBe('/login')

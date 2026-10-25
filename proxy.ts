@@ -3,10 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isBanned } from '@/lib/user-status'
 
 /**
- * Middleware para proteger rutas privadas
- * Verifica autenticación y redirige si es necesario
+ * Proxy (antes "middleware" en Next < 16): protege rutas privadas.
+ * Verifica autenticación y redirige si es necesario.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { NextRequest } from 'next/server'
-import { middleware } from '@/middleware'
+import { proxy } from '@/proxy'
 import { adminClient, createUser, deleteUsers, sessionCookies, uniqueEmail, strongPassword, type TestUser } from '../helpers/users'
 import { CookieJar } from '../helpers/cookie-jar'
 import { E2E_BASE_URL } from '../helpers/local-supabase'
 
 async function visit(pathname: string, cookies?: CookieJar) {
-  const res = await middleware(
+  const res = await proxy(
     new NextRequest(`${E2E_BASE_URL}${pathname}`, { headers: cookies ? { cookie: cookies.toHeader() } : {} })
   )
   const location = res.headers.get('location')
@@ -39,7 +39,7 @@ afterAll(async () => {
   await deleteUsers([user.id, invitedNoPassword.id])
 })
 
-describe('middleware sin sesión', () => {
+describe('proxy sin sesión', () => {
   it.each(['/dashboard', '/dashboard/profile', '/dashboard/admin'])('ACC-01 %s → /login?redirectTo=<ruta>', async (path) => {
     const { status, location } = await visit(path)
     expect(status).toBe(307)
@@ -58,13 +58,13 @@ describe('middleware sin sesión', () => {
     expect(status).toBe(200)
   })
 
-  it('CNF /auth/confirm no lo bloquea el middleware', async () => {
+  it('CNF /auth/confirm no lo bloquea el proxy', async () => {
     const { location } = await visit('/auth/confirm?token_hash=x&type=invite')
     expect(location).toBeNull()
   })
 })
 
-describe('middleware con sesión', () => {
+describe('proxy con sesión', () => {
   it('ACC-01 /dashboard pasa', async () => {
     const { location } = await visit('/dashboard', userCookies)
     expect(location).toBeNull()
@@ -81,7 +81,7 @@ describe('middleware con sesión', () => {
   })
 })
 
-describe('middleware: invitado sin contraseña', () => {
+describe('proxy: invitado sin contraseña', () => {
   it.each(['/dashboard', '/dashboard/profile', '/login', '/forgot-password'])('ACC-05 %s → /set-password', async (path) => {
     const { location } = await visit(path, invitedCookies)
     expect(location?.pathname).toBe('/set-password')

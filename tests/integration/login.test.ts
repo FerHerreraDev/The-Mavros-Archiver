@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { loginAction, logoutAction } from '@/lib/actions/auth.actions'
-import { middleware } from '@/middleware'
+import { proxy } from '@/proxy'
 import { requestContext, resetRequest, runAndCaptureRedirect, formData } from '../helpers/request-context'
 import { createUser, deleteUsers, randomIp, uniqueEmail, type TestUser } from '../helpers/users'
 import { E2E_BASE_URL } from '../helpers/local-supabase'
@@ -84,6 +84,17 @@ describe('loginAction', () => {
     expect(requestContext.cookies.hasSupabaseSession()).toBe(false)
   })
 
+  it('OPS-04 agregar valores falsos al final de x-forwarded-for no evita el bloqueo', async () => {
+    const ip = randomIp()
+    for (let i = 0; i < 5; i++) {
+      resetRequest({ ip: `${ip}, 10.99.0.${i}` })
+      await loginAction(formData({ email: user.email, password: 'wrong-password-123' }))
+    }
+    resetRequest({ ip: `${ip}, 10.99.0.200` })
+    const result = await loginAction(formData({ email: user.email, password: user.password }))
+    expect(result?.error).toMatch(/too many|demasiados/i)
+  })
+
   it('AUTH-04 otra IP no se ve afectada', async () => {
     for (let i = 0; i < 6; i++) {
       await loginAction(formData({ email: user.email, password: 'wrong-password-123' }))
@@ -105,7 +116,7 @@ describe('logoutAction', () => {
     expect(redirect).toBe('/login')
     expect(requestContext.cookies.hasSupabaseSession()).toBe(false)
 
-    const res = await middleware(
+    const res = await proxy(
       new NextRequest(`${E2E_BASE_URL}/dashboard`, { headers: { cookie: requestContext.cookies.toHeader() } })
     )
     expect(new URL(res.headers.get('location')!).pathname).toBe('/login')

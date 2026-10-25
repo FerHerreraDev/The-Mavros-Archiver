@@ -1,60 +1,28 @@
+import 'server-only'
+import { createAdminClient } from '@/lib/supabase/admin'
+
 /**
- * Simple in-memory rate limiter
- * For production, use Upstash Redis or similar
+ * Rate limit compartido en Postgres (OPS-01..OPS-03). Ver migración 20261025000006.
+ * 5 intentos por minuto por clave, igual que antes (AUTH-04).
+ *
+ * Falla cerrado: si el contador no responde, la acción se bloquea.
  */
+export const RATE_LIMIT_MAX = 5
+export const RATE_LIMIT_WINDOW_SECONDS = 60
 
-interface RateLimitEntry {
-  count: number
-  resetAt: number
-}
-
-class RateLimiter {
-  private store = new Map<string, RateLimitEntry>()
-  private readonly maxAttempts: number
-  private readonly windowMs: number
-
-  constructor(maxAttempts: number = 5, windowMs: number = 60000) {
-    this.maxAttempts = maxAttempts
-    this.windowMs = windowMs
-
-    // Cleanup old entries every minute
-    setInterval(() => this.cleanup(), 60000)
-  }
-
-  async limit(identifier: string): Promise<{ success: boolean; remaining: number }> {
-    const now = Date.now()
-    const entry = this.store.get(identifier)
-
-    // No entry or expired - create new
-    if (!entry || now > entry.resetAt) {
-      this.store.set(identifier, {
-        count: 1,
-        resetAt: now + this.windowMs,
-      })
-      return { success: true, remaining: this.maxAttempts - 1 }
-    }
-
-    // Increment count
-    entry.count++
-
-    // Check if exceeded
-    if (entry.count > this.maxAttempts) {
-      return { success: false, remaining: 0 }
-    }
-
-    return { success: true, remaining: this.maxAttempts - entry.count }
-  }
-
-  private cleanup() {
-    const now = Date.now()
-    for (const [key, entry] of this.store.entries()) {
-      if (now > entry.resetAt) {
-        this.store.delete(key)
-      }
-    }
+export async function limitWith(key: string, max: number, windowSeconds: number) {
+  try {
+    const { data, error } = await createAdminClient()
+      .rpc('rate_limit_hit', { p_key: key, p_max: max, p_window_seconds: windowSeconds })
+      .single<{ allowed: boolean; remaining: number }>()
+    if (error || !data) throw new Error(error?.message ?? 'sin respuesta')
+    return { success: data.allowed, remaining: data.remaining }
+  } catch (err) {
+    console.error('[RATE LIMIT] Contador no disponible, se bloquea:', (err as Error).message)
+    return { success: false, remaining: 0 }
   }
 }
 
-// Export singleton instance
-// 5 attempts per minute per IP
-export const ratelimit = new RateLimiter(5, 60000)
+export const ratelimit = {
+  limit: (key: string) => limitWith(key, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_SECONDS),
+}

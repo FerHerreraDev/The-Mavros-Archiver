@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Static checks
+        run: |
+          pnpm typecheck
+          pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      # Supabase local en Docker (los runners de GitHub ya traen Docker)
+      - name: Start local Supabase
+        run: pnpm db:start
+
+      - name: Integration + DB/RLS tests
+        run: pnpm test:integration
+
+      # Chromium para la mayoría; Google Chrome (ya instalado en el runner) para reproducir H.264
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7

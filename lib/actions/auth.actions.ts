@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { ratelimit } from '@/lib/rate-limit'
+import { clientIp } from '@/lib/client-ip'
 import { headers } from 'next/headers'
 
 // Timeout para requests de Supabase
@@ -31,8 +32,8 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function loginAction(formData: FormData) {
   // RATE LIMITING - Prevenir brute force attacks
   const headersList = await headers()
-  const ip = headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown'
-  const { success, remaining } = await ratelimit.limit(`login:${ip}`)
+  const ip = clientIp(headersList)
+  const { success } = await ratelimit.limit(`login:${ip}`)
   
   if (!success) {
     console.warn(`[AUTH] Rate limit exceeded for IP: ${ip}`)
@@ -61,7 +62,7 @@ export async function loginAction(formData: FormData) {
 
   try {
     // Authenticate user with timeout protection
-    const { error, data } = await withTimeout(
+    const { error } = await withTimeout(
       supabase.auth.signInWithPassword({
         email: result.data.email,
         password: result.data.password,
@@ -177,7 +178,7 @@ export async function setPasswordAction(formData: FormData) {
  */
 export async function forgotPasswordAction(formData: FormData) {
   const headersList = await headers()
-  const ip = headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown'
+  const ip = clientIp(headersList)
   const { success } = await ratelimit.limit(`forgot:${ip}`)
 
   if (!success) {

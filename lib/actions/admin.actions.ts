@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/auth/guards'
 import { userStatus } from '@/lib/user-status'
 import { z } from 'zod'
 import { ratelimit } from '@/lib/rate-limit'
+import { clientIp } from '@/lib/client-ip'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { getSiteUrl } from '@/lib/site-url'
@@ -41,7 +42,7 @@ const UserIdSchema = z.uuid()
 export async function inviteUserAction(formData: FormData): Promise<AdminActionResult> {
   // 1. RATE LIMITING - Proteger el endpoint de invitaciones
   const headersList = await headers()
-  const ip = headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown'
+  const ip = clientIp(headersList)
   const { success } = await ratelimit.limit(`invite:${ip}`)
 
   if (!success) {
