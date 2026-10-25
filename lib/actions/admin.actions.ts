@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { ratelimit } from '@/lib/rate-limit'
 import { headers } from 'next/headers'
+import { getSiteUrl } from '@/lib/site-url'
 
 const TIMEOUT_MS = 10000 // 10 segundos
 
@@ -63,10 +64,14 @@ export async function inviteUserAction(formData: FormData) {
 
     // 5. EJECUCIÓN: Despertamos el God Mode (Admin Client)
     const adminClient = createAdminClient()
+    const siteUrl = await getSiteUrl()
     
     // Disparamos la invitación con protección de Timeout
+    // El link del correo cae en /auth/confirm, que crea la sesión y manda a /set-password
     const { error: inviteError } = await withTimeout(
-      adminClient.auth.admin.inviteUserByEmail(email),
+      adminClient.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${siteUrl}/auth/confirm?next=/set-password`,
+      }),
       TIMEOUT_MS
     )
 

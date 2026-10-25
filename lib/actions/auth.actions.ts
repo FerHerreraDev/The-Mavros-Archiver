@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { loginSchema } from '@/lib/validations/auth.schema'
+import { loginSchema, forgotPasswordSchema, resetPasswordSchema } from '@/lib/validations/auth.schema'
+import { getSiteUrl } from '@/lib/site-url'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -100,6 +101,117 @@ export async function loginAction(formData: FormData) {
 
   revalidatePath('/', 'layout')
   redirect('/dashboard')
+}
+
+/**
+ * Server action para que un usuario invitado (o en recuperación) elija su contraseña
+ * Requiere sesión activa: la crea /auth/confirm al abrir el link del correo
+ */
+export async function setPasswordAction(formData: FormData) {
+  const result = resetPasswordSchema.safeParse({
+    password: formData.get('password'),
+    confirmPassword: formData.get('confirmPassword'),
+  })
+
+  if (!result.success) {
+    const flattened = z.flattenError(result.error)
+    return {
+      error: 'Invalid input',
+      fieldErrors: flattened.fieldErrors,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Your session expired. Open the link from your email again.' }
+  }
+
+  const { success } = await ratelimit.limit(`set-password:${user.id}`)
+  if (!success) {
+    return { error: 'Too many attempts. Please try again in a minute.' }
+  }
+
+  try {
+    const { error } = await withTimeout(
+      supabase.auth.updateUser({
+        password: result.data.password,
+        // El middleware usa esta marca para no dejar pasar al dashboard
+        // a un invitado que todavía no eligió contraseña
+        data: { password_set: true },
+      }),
+      TIMEOUT_MS
+    )
+
+    if (error) {
+      console.error('[AUTH] Set password failed:', error.message)
+
+      if (error.code === 'same_password') {
+        return { error: 'The new password must be different from the current one.' }
+      }
+      if (error.code === 'weak_password') {
+        return { error: 'That password is too weak. Try a longer one.' }
+      }
+      return { error: 'Could not update your password. Please try again.' }
+    }
+  } catch (err) {
+    console.error('[AUTH] Unexpected error during set password:', err)
+
+    if (err instanceof Error && err.message === 'Request timeout') {
+      return { error: 'Request timed out. Please try again.' }
+    }
+
+    return { error: 'An unexpected error occurred. Please try again.' }
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/dashboard')
+}
+
+/**
+ * Server action para pedir un link de recuperación de contraseña
+ * Siempre responde lo mismo para no revelar qué correos existen
+ */
+export async function forgotPasswordAction(formData: FormData) {
+  const headersList = await headers()
+  const ip = headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown'
+  const { success } = await ratelimit.limit(`forgot:${ip}`)
+
+  if (!success) {
+    return { error: 'Too many attempts. Please try again in a minute.' }
+  }
+
+  const result = forgotPasswordSchema.safeParse({ email: formData.get('email') })
+
+  if (!result.success) {
+    const flattened = z.flattenError(result.error)
+    return {
+      error: 'Invalid input',
+      fieldErrors: flattened.fieldErrors,
+    }
+  }
+
+  const supabase = await createClient()
+  const siteUrl = await getSiteUrl()
+
+  try {
+    const { error } = await withTimeout(
+      supabase.auth.resetPasswordForEmail(result.data.email, {
+        redirectTo: `${siteUrl}/auth/confirm?next=/set-password`,
+      }),
+      TIMEOUT_MS
+    )
+
+    if (error) {
+      // Solo log: al usuario siempre le decimos lo mismo
+      console.error('[AUTH] Reset password email failed:', error.message)
+    }
+  } catch (err) {
+    console.error('[AUTH] Unexpected error during forgot password:', err)
+  }
+
+  return { success: 'If that email has access, a reset link is on its way.' }
 }
 
 /**

@@ -36,25 +36,43 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const { pathname } = request.nextUrl
+
+  // Redirect que conserva las cookies de sesión que Supabase pudo refrescar arriba
+  const redirectTo = (path: string, params?: Record<string, string>) => {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = path
+    redirectUrl.search = ''
+    Object.entries(params ?? {}).forEach(([key, value]) => redirectUrl.searchParams.set(key, value))
+    const response = NextResponse.redirect(redirectUrl)
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie))
+    return response
+  }
+
   // Rutas protegidas que requieren autenticación
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
+  const isProtectedRoute = pathname.startsWith('/dashboard')
+  const isSetPasswordRoute = pathname.startsWith('/set-password')
 
   // Rutas de autenticación (no hay registro público: acceso solo por invitación)
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/forgot-password')
+
+  // Invitado que abrió el link pero aún no eligió contraseña.
+  // password_set lo pone setPasswordAction (no es control de seguridad, solo de flujo)
+  const mustSetPassword = !!user?.invited_at && !user.user_metadata?.password_set
 
   // Si intenta acceder a ruta protegida sin estar autenticado
-  if (isProtectedRoute && !user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    redirectUrl.searchParams.set('redirectTo', request.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+  if ((isProtectedRoute || isSetPasswordRoute) && !user) {
+    return redirectTo('/login', isProtectedRoute ? { redirectTo: pathname } : undefined)
+  }
+
+  // Invitado sin contraseña: primero /set-password
+  if ((isProtectedRoute || isAuthRoute) && mustSetPassword) {
+    return redirectTo('/set-password')
   }
 
   // Si está autenticado e intenta acceder a login, redirigir a dashboard
   if (isAuthRoute && user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/dashboard'
-    return NextResponse.redirect(redirectUrl)
+    return redirectTo('/dashboard')
   }
 
   return supabaseResponse

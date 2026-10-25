@@ -14,9 +14,9 @@ import { Label } from '@/components/ui/label'
 
 const ICON_CLASSES = "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
 
-export function LoginForm() {
+export function LoginForm({ initialError }: { initialError?: string }) {
   const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError ?? null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
 
   const [emailValue, setEmailValue] = useState('')
