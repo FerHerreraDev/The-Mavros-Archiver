@@ -12,11 +12,16 @@ export async function getSessionUser() {
 
   if (error || !user || isBanned(user)) return null
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
+
+  // Sin perfil legible se trata como 'user' (lo seguro), pero no en silencio
+  if (profileError) {
+    console.error('[AUTH] No se pudo leer el perfil:', profileError.message)
+  }
 
   const role: Role = profile?.role === 'admin' ? 'admin' : 'user'
   return { supabase, user, role }
