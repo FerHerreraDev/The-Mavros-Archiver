@@ -47,34 +47,6 @@ export const loginSchema = z.object({
 })
 
 /**
- * Schema para Registro
- * - Email válido
- * - Password entre 8-64 caracteres
- * - Confirmación de password debe coincidir
- */
-export const registerSchema = z
-  .object({
-    email: z
-      .string()
-      .min(1, 'El email es requerido')
-      .regex(
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        'Email inválido'
-      )
-      .toLowerCase()
-      .trim(),
-    password: z
-      .string()
-      .min(8, 'La contraseña debe tener al menos 8 caracteres')
-      .max(64, 'La contraseña no puede exceder 64 caracteres'),
-    confirmPassword: z.string().min(1, 'Confirma tu contraseña'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Las contraseñas no coinciden',
-    path: ['confirmPassword'],
-  })
-
-/**
  * Schema para Recuperación de Contraseña
  * - Solo requiere email válido
  */
@@ -113,6 +85,5 @@ export const resetPasswordSchema = z
  * Úsalos en tus componentes y funciones
  */
 export type LoginInput = z.infer<typeof loginSchema>
-export type RegisterInput = z.infer<typeof registerSchema>
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

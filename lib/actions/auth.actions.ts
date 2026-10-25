@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { loginSchema, registerSchema } from '@/lib/validations/auth.schema'
+import { loginSchema } from '@/lib/validations/auth.schema'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -103,52 +103,8 @@ export async function loginAction(formData: FormData) {
 }
 
 /**
- * Server action for user registration
- * Creates new user account with email confirmation
- */
-export async function registerAction(formData: FormData) {
-  const email = formData.get('email')
-  const password = formData.get('password')
-  const confirmPassword = formData.get('confirmPassword')
-
-  // Validate input with Zod schema
-  const result = registerSchema.safeParse({ email, password, confirmPassword })
-
-  if (!result.success) {
-    const flattened = z.flattenError(result.error)
-    return {
-      error: 'Invalid input',
-      fieldErrors: flattened.fieldErrors,
-    }
-  }
-
-  // Create server-side Supabase client
-  const supabase = await createClient()
-
-  // Create new user account
-  const { error } = await supabase.auth.signUp({
-    email: result.data.email,
-    password: result.data.password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-    },
-  })
-
-  if (error) {
-    // Check for specific errors
-    if (error.message.includes('already registered')) {
-      return { error: 'Email already registered' }
-    }
-    return { error: 'Registration failed. Please try again.' }
-  }
-
-  // Redirect to confirmation page
-  redirect('/auth/confirm-email')
-}
-
-/**
  * Server action for user logout
- * Clears session and redirects to home
+ * Clears session and redirects to login
  */
 export async function logoutAction() {
   const supabase = await createClient()
@@ -163,5 +119,5 @@ export async function logoutAction() {
   revalidatePath('/', 'layout')
   
   // Note: redirect() throws a Next.js error to stop execution
-  redirect('/')
+  redirect('/login')
 }

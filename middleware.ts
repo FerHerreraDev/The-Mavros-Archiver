@@ -39,9 +39,8 @@ export async function middleware(request: NextRequest) {
   // Rutas protegidas que requieren autenticación
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
 
-  // Rutas de autenticación (login, register)
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || 
-                      request.nextUrl.pathname.startsWith('/register')
+  // Rutas de autenticación (no hay registro público: acceso solo por invitación)
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
 
   // Si intenta acceder a ruta protegida sin estar autenticado
   if (isProtectedRoute && !user) {
@@ -51,7 +50,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Si está autenticado e intenta acceder a login/register, redirigir a dashboard
+  // Si está autenticado e intenta acceder a login, redirigir a dashboard
   if (isAuthRoute && user) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/dashboard'
