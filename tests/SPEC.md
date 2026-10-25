@@ -149,3 +149,17 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 | ID | Requisito |
 |---|---|
 | UI-01 | En un teléfono (390 px de ancho) ninguna página (login, catálogo, perfil, admin) tiene scroll horizontal; los enlaces del navbar siguen accesibles por nombre. |
+
+## Contenido — pipeline de video (HLS)
+
+Aplica a cada película que se sube a R2. Se verifica con `pnpm hls:verify` (local antes de subir, y contra R2 después).
+
+| ID | Requisito |
+|---|---|
+| VID-01 | Existe un `master.m3u8` con al menos 3 calidades (resoluciones distintas), cada una con `BANDWIDTH`, `RESOLUTION` y `CODECS`. |
+| VID-02 | Cada calidad es VOD completa (`#EXT-X-PLAYLIST-TYPE:VOD` y `#EXT-X-ENDLIST`). |
+| VID-03 | Todos los segmentos, salvo el último, duran 6 s (±0.1 s); ninguno supera `#EXT-X-TARGETDURATION`. |
+| VID-04 | Las calidades están alineadas: mismo número de segmentos y la misma duración en cada posición (±0.05 s), para cambiar de calidad sin saltos. |
+| VID-05 | La duración total de cada calidad coincide con la del archivo original (±1 s). |
+| VID-06 | La calidad más alta conserva la resolución original, y ninguna calidad tiene más resolución que el original. |
+| VID-07 | En R2, cada playlist y cada segmento responde 200 con su tipo correcto (`application/vnd.apple.mpegurl` / `video/mp2t`) y permite CORS. |

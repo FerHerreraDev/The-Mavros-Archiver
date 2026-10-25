@@ -14,7 +14,10 @@
     "test:all": "pnpm typecheck && pnpm lint && vitest run && playwright test",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "hls:encode": "scripts/encode-hls.sh",
+    "hls:verify": "node scripts/hls-verify.mjs",
+    "r2:upload": "scripts/r2-upload.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
