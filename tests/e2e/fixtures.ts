@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect, type Page, type Browser } from '@playwright/test'
 import { randomIp } from '../helpers/users'
 
 /**
@@ -18,6 +18,20 @@ export async function login(page: Page, email: string, password: string) {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: /sign in/i }).click()
+}
+
+/** Login completo desde cero; termina en /dashboard */
+export async function loginAs(page: Page, user: { email: string; password: string }) {
+  await page.goto('/login')
+  await login(page, user.email, user.password)
+  await expect(page).toHaveURL(/\/dashboard$/)
+}
+
+/** Página en un navegador aparte (otra persona, sin cookies compartidas) */
+export async function otherPerson(browser: Browser) {
+  const context = await browser.newContext()
+  await context.setExtraHTTPHeaders({ 'x-forwarded-for': randomIp() })
+  return context.newPage()
 }
 
 /** Alerta de error del formulario (excluye el anunciador de rutas de Next, que también es role=alert) */

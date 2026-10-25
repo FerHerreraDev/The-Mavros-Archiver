@@ -1,10 +1,10 @@
-import { test, expect, login, formAlert } from './fixtures'
-import { adminClient, deleteUsers, strongPassword, uniqueEmail, findUserByEmail } from '../helpers/users'
+import { test, expect, login, loginAs, otherPerson, formAlert } from './fixtures'
+import { adminClient, createUser, deleteUsers, strongPassword, uniqueEmail, findUserByEmail } from '../helpers/users'
 import { waitForEmail, extractLink } from '../helpers/mailpit'
 import { E2E_BASE_URL } from '../helpers/local-supabase'
 
-// Hasta la Fase 2 no hay UI de invitación: se invita con la misma llamada que hace inviteUserAction.
-// En la Fase 2 este paso pasa a ser el formulario del panel admin.
+// INV-04 invita desde el formulario del panel admin; el resto de pruebas invitan por API
+// (misma llamada que inviteUserAction) porque prueban lo que pasa después del correo.
 async function inviteAndGetLink(prefix: string) {
   const email = uniqueEmail(prefix)
   const { error } = await adminClient().auth.admin.inviteUserByEmail(email, {
@@ -21,9 +21,23 @@ test.afterAll(async () => {
   await deleteUsers(users.flatMap((u) => (u ? [u.id] : [])))
 })
 
-test('INV-04 flujo completo de invitación', async ({ page }) => {
-  const { email, link } = await inviteAndGetLink('e2e-invite')
+test('INV-04 flujo completo de invitación', async ({ page, browser }) => {
+  const email = uniqueEmail('e2e-invite')
   created.push(email)
+
+  // Un admin invita desde el panel
+  const admin = await createUser({ role: 'admin', prefix: 'e2e-inviter' })
+  created.push(admin.email)
+  const adminPage = await otherPerson(browser)
+  await loginAs(adminPage, admin)
+  await adminPage.goto('/dashboard/admin')
+  await adminPage.getByLabel(/email del invitado/i).fill(email)
+  await adminPage.getByRole('button', { name: 'Enviar invitación', exact: true }).click()
+  await expect(adminPage.getByRole('status').filter({ hasText: email })).toBeVisible()
+  await adminPage.context().close()
+
+  const mail = await waitForEmail(email)
+  const link = extractLink(mail.HTML, '/auth/confirm')
 
   // Abre el link del correo → elige contraseña
   await page.goto(link)

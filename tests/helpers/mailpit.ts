@@ -31,6 +31,26 @@ export async function waitForEmail(email: string, timeoutMs = 10_000): Promise<M
   throw new Error(`No llegó ningún correo a ${email} en ${timeoutMs}ms`)
 }
 
+/** Contenido completo de un correo por ID */
+export async function readEmail(id: string): Promise<MailpitMessage> {
+  const res = await fetch(`${mailpitUrl()}/api/v1/message/${id}`)
+  return (await res.json()) as MailpitMessage
+}
+
+/** Espera hasta que haya al menos `count` correos para ese email y devuelve el más reciente */
+export async function waitForEmailCount(email: string, count: number, timeoutMs = 10_000): Promise<MailpitMessage> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const messages = await listEmailsTo(email)
+    if (messages.length >= count) {
+      const res = await fetch(`${mailpitUrl()}/api/v1/message/${messages[0].ID}`)
+      return (await res.json()) as MailpitMessage
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  throw new Error(`Se esperaban ${count} correos para ${email} en ${timeoutMs}ms`)
+}
+
 /** Espera un rato y confirma que NO llegó correo (para pruebas de "no se envía nada") */
 export async function expectNoEmail(email: string, waitMs = 1_500) {
   await new Promise((r) => setTimeout(r, waitMs))

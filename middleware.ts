@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isBanned } from '@/lib/user-status'
 
 /**
  * Middleware para proteger rutas privadas
@@ -33,8 +34,15 @@ export async function middleware(request: NextRequest) {
 
   // Verificar sesión
   const {
-    data: { user },
+    data: { user: sessionUser },
   } = await supabase.auth.getUser()
+
+  // Usuario desactivado por un admin: se cierra su sesión aquí mismo (borra cookies)
+  let user = sessionUser
+  if (user && isBanned(user)) {
+    await supabase.auth.signOut({ scope: 'local' })
+    user = null
+  }
 
   const { pathname } = request.nextUrl
 

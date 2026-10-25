@@ -39,6 +39,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 | DB-07 | `role` solo acepta `'admin'` o `'user'`. |
 | DB-08 | Al crear un usuario (invitación o admin) se crea su perfil con `role = 'user'` y su email. |
 | DB-09 | Al borrar un usuario se borra su perfil. |
+| DB-10 | Ni un visitante anónimo ni un usuario autenticado (aunque sea admin) pueden ejecutar `revoke_user_sessions` desde el cliente. |
 | ACC-03 | `/` lleva a `/dashboard` (y de ahí a `/login` si no hay sesión). |
 
 ## Fase 1 — Acceso, invitación y recuperación
@@ -100,3 +101,51 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 | ID | Requisito |
 |---|---|
 | UTIL-01 | La URL del sitio para correos usa `NEXT_PUBLIC_SITE_URL` (sin `/` final) si existe; si no, el origin del request; si no, el host reenviado; si no, `http://localhost:3000`. |
+
+## Fase 2 — Perfil y panel de administración
+
+### Perfil (`/dashboard/profile`)
+
+| ID | Requisito |
+|---|---|
+| PRF-01 | Muestra el email, el User ID, el rol y el estado de la cuenta del usuario con sesión. |
+| PRF-02 | Solo muestra datos del usuario con sesión (nunca de otro), aunque se manipule la URL. |
+
+### Acceso al panel (`/dashboard/admin`)
+
+| ID | Requisito |
+|---|---|
+| ADM-01 | Un usuario con rol `user` que entra a `/dashboard/admin` es enviado a `/dashboard` y no ve contenido de admin. La verificación es en el servidor. |
+| ADM-02 | Un admin ve el formulario de invitación y la tabla de usuarios. |
+
+### Invitar desde el panel
+
+| ID | Requisito |
+|---|---|
+| ADM-03 | El formulario de invitación envía la invitación, muestra mensaje de éxito y limpia el campo. Errores (email inválido, ya registrado) se muestran en el formulario. |
+| ADM-04 | Tras invitar, el usuario aparece en la tabla con estado "pendiente" sin recargar manualmente. |
+
+### Tabla de usuarios
+
+| ID | Requisito |
+|---|---|
+| ADM-05 | Lista **todos** los usuarios con email, rol, estado (`activo` / `pendiente` / `desactivado`), fecha de alta y último acceso. Pendiente = invitado que aún no eligió contraseña. |
+| ADM-06 | Un admin puede cambiar el rol de otro usuario entre `user` y `admin`. El cambio tiene efecto en el siguiente request de ese usuario (aparece/desaparece su enlace Admin). |
+| ADM-07 | Un admin **no** puede cambiar su propio rol (evita quedarse sin admins por accidente). |
+| ADM-08 | Un admin puede reenviar la invitación a un usuario pendiente; le llega un correo nuevo con un link que funciona. Reenviar a un usuario activo o desactivado da error. |
+| ADM-09 | Un admin puede desactivar a otro usuario: ese usuario ya no puede hacer login **y pierde el acceso aunque tenga una sesión abierta**. Sus sesiones quedan cerradas para siempre: si luego se le reactiva, tiene que volver a iniciar sesión. |
+| ADM-10 | Un admin puede reactivar a un usuario desactivado; vuelve a poder hacer login con su contraseña. |
+| ADM-11 | Un admin **no** puede desactivarse a sí mismo. |
+
+### Seguridad de las acciones de admin
+
+| ID | Requisito |
+|---|---|
+| ADM-12 | Toda acción de admin (invitar, cambiar rol, reenviar, desactivar/reactivar) y la carga de la tabla rechazan a visitantes sin sesión y a usuarios con rol `user`, sin cambiar nada. |
+| ADM-13 | Las acciones validan su entrada: un `userId` que no es UUID, o un rol fuera de `admin`/`user`, se rechaza sin cambiar nada. Un UUID que no existe da error. |
+
+### Interfaz
+
+| ID | Requisito |
+|---|---|
+| UI-01 | En un teléfono (390 px de ancho) ninguna página (login, catálogo, perfil, admin) tiene scroll horizontal; los enlaces del navbar siguen accesibles por nombre. |
