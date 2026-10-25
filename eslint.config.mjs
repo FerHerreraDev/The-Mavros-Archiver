@@ -12,7 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Artefactos de pruebas
+    // Artefactos de pruebas (los .ts de fixtures son segmentos de video MPEG-TS, no TypeScript)
+    "tests/fixtures/**",
     ".next-e2e/**",
     "playwright-report/**",
     "test-results/**",

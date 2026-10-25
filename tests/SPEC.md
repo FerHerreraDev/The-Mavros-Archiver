@@ -148,7 +148,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 
 | ID | Requisito |
 |---|---|
-| UI-01 | En un teléfono (390 px de ancho) ninguna página (login, catálogo, perfil, admin) tiene scroll horizontal; los enlaces del navbar siguen accesibles por nombre. |
+| UI-01 | En un teléfono (390 px de ancho) ninguna página (login, catálogo, reproducción, perfil, admin y películas) tiene scroll horizontal; los enlaces del navbar siguen accesibles por nombre. |
 
 ## Contenido — pipeline de video (HLS)
 
@@ -223,3 +223,35 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | ID | Requisito |
 |---|---|
 | PLY-09 | Al guardar una película, el servidor verifica el video **a través del Worker** con un token propio (MOV-08 sigue cumpliéndose con el bucket privado). |
+
+## Fase 5 — Catálogo y reproductor
+
+### Catálogo (`/dashboard`)
+
+| ID | Requisito |
+|---|---|
+| CAT-01 | Muestra **solo películas publicadas**, para todos (también para admins: los borradores se ven en el panel, no en el catálogo). |
+| CAT-02 | "Recién agregadas" ordena por fecha de publicación, la más reciente primero. |
+| CAT-03 | Cada tarjeta muestra póster (o un placeholder), título, año y duración, y lleva a `/dashboard/watch/<slug>`. |
+| CAT-04 | Filtro por género: los chips salen de los géneros de las películas publicadas; elegir uno filtra y queda en la URL (`?genre=…`); "Todas" quita el filtro. Un género que no existe muestra el estado vacío. |
+| CAT-05 | Sin películas, se muestra un estado vacío claro (no una cuadrícula vacía). |
+| CAT-06 | "Seguir viendo" muestra las películas que el usuario dejó a medias (entre 5 % y 95 %), la más reciente primero, con barra de progreso; no aparece si no hay ninguna. |
+
+### Ver película (`/dashboard/watch/<slug>`)
+
+| ID | Requisito |
+|---|---|
+| WATCH-01 | Una película publicada se puede ver; un borrador solo lo ve un admin (vista previa). Slug inexistente o borrador para un `user` → 404. |
+| WATCH-02 | El video se reproduce de verdad en el navegador (avanza el tiempo) usando la URL firmada del Worker; incluye controles, pantalla completa y selección de calidad. |
+| WATCH-03 | Si el token caduca o el Worker responde 403 durante la reproducción, el reproductor pide una URL nueva a `/api/playback` y sigue desde el mismo punto, sin que el usuario haga nada. |
+| WATCH-04 | La página muestra título, año, duración, géneros y sinopsis. |
+
+### Progreso (`watch_progress`)
+
+| ID | Requisito |
+|---|---|
+| PRG-01 | Mientras se ve, el progreso se guarda (cada ~10 s, al pausar y al salir). Lo escribe el propio cliente con su sesión (igual que hará Android). |
+| PRG-02 | Al volver a abrir la película, arranca donde se quedó. Si estaba casi terminada (≥ 95 %) o recién empezada (< 10 s), arranca desde el principio. |
+| PRG-03 | RLS: cada usuario solo lee y escribe **su** progreso; no puede leer ni escribir el de otro ni a nombre de otro. Anónimos nada. |
+| PRG-04 | Solo se puede guardar progreso de películas que el usuario puede ver (no de borradores ajenos); la posición está entre 0 y la duración de la película. |
+| PRG-05 | Hay un solo registro por usuario y película (guardar otra vez lo actualiza); borrar la película o el usuario borra su progreso. |

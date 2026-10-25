@@ -1,11 +1,22 @@
 import { test, expect, loginAs } from './fixtures'
-import { createUser, deleteUsers, type TestUser } from '../helpers/users'
+import { adminClient, createUser, deleteUsers, type TestUser } from '../helpers/users'
 
 let admin: TestUser
+let movieId: string
+const slug = `e2e-mobile-${Math.random().toString(36).slice(2, 8)}`
 test.beforeAll(async () => {
   admin = await createUser({ role: 'admin', prefix: 'e2e-mobile' })
+  const { data } = await adminClient()
+    .from('movies')
+    .insert({ slug, title: 'E2E Móvil con un título bastante largo para probar', duration_seconds: 12, hls_path: 'sample/master.m3u8', status: 'published' })
+    .select('id')
+    .single()
+  movieId = data!.id
 })
-test.afterAll(() => deleteUsers([admin.id]))
+test.afterAll(async () => {
+  await adminClient().from('movies').delete().eq('id', movieId)
+  await deleteUsers([admin.id])
+})
 
 test.use({ viewport: { width: 390, height: 844 } })
 
@@ -18,7 +29,7 @@ test('UI-01 sin scroll horizontal en móvil y navbar accesible', async ({ page }
   expect(await hasHorizontalScroll(page), '/login').toBe(false)
 
   await loginAs(page, admin)
-  for (const path of ['/dashboard', '/dashboard/profile', '/dashboard/admin']) {
+  for (const path of ['/dashboard', `/dashboard/watch/${slug}`, '/dashboard/profile', '/dashboard/admin', '/dashboard/admin/movies']) {
     await page.goto(path)
     expect(await hasHorizontalScroll(page), path).toBe(false)
   }

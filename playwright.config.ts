@@ -19,7 +19,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /watch\.spec\.ts/ },
+    // Reproducción real: el Chromium de Playwright no trae H.264/AAC; Google Chrome sí
+    { name: 'chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' }, testMatch: /watch\.spec\.ts/ },
+  ],
   webServer: [
     {
       command: `node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/helpers/video-cdn-server.ts tests/fixtures/hls ${VIDEO_PORT}`,
