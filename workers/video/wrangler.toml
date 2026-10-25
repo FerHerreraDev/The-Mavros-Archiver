@@ -1,0 +1,11 @@
+# Worker de video: sirve el bucket privado de R2 solo con token firmado (Fase 4).
+#   Desplegar:  pnpm video:deploy
+#   Secreto:    VIDEO_TOKEN_SECRET (el mismo que .env.local), con `wrangler secret put`
+name = "mavros-video"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "VIDEOS"
+bucket_name = "videos"

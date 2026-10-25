@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 import { readLocalSupabase, appTestEnv, E2E_BASE_URL, E2E_PORT } from './tests/helpers/local-supabase'
+import { TEST_VIDEO_SECRET } from './tests/helpers/test-secrets'
 
-// "R2" local con los fixtures HLS, para crear películas sin depender de internet
+// Worker de video real sobre un "R2" local con los fixtures HLS (sin internet)
 const VIDEO_PORT = 3101
 
 const local = readLocalSupabase()
@@ -21,9 +22,11 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: `node tests/helpers/static-server.mjs tests/fixtures/hls ${VIDEO_PORT}`,
-      url: `http://127.0.0.1:${VIDEO_PORT}/ladder/master.m3u8`,
+      command: `node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/helpers/video-cdn-server.ts tests/fixtures/hls ${VIDEO_PORT}`,
+      // Sin token responde 403: basta para saber que ya escucha
+      url: `http://127.0.0.1:${VIDEO_PORT}/`,
       reuseExistingServer: false,
+      env: { VIDEO_TOKEN_SECRET: TEST_VIDEO_SECRET },
     },
     {
       // Build de producción real, apuntando al Supabase local, en .next-e2e
@@ -33,7 +36,8 @@ export default defineConfig({
       timeout: 240_000,
       env: {
         ...appTestEnv(local),
-        NEXT_PUBLIC_VIDEO_BASE_URL: `http://127.0.0.1:${VIDEO_PORT}`,
+        VIDEO_CDN_URL: `http://127.0.0.1:${VIDEO_PORT}`,
+        VIDEO_TOKEN_SECRET: TEST_VIDEO_SECRET,
         NEXT_DIST_DIR: '.next-e2e',
       },
     },

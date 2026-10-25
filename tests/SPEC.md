@@ -190,3 +190,36 @@ Pensado para varios clientes (web y la futura app Android en Kotlin): las reglas
 | MOV-11 | Un admin puede editar, publicar, despublicar y borrar. Borrar pide confirmación y no toca los archivos en R2. |
 | MOV-12 | Un `user` que entra a `/dashboard/admin/movies` vuelve a `/dashboard`; todas las acciones de películas rechazan a anónimos y `user` sin cambiar nada. |
 | MOV-13 | El panel admin tiene pestañas **Usuarios** / **Películas**. |
+
+## Fase 4 — Acceso protegido al video
+
+El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entrega archivos con un token firmado que emite la app. El mismo flujo sirve para la web y para la app Android.
+
+### Token de reproducción
+
+| ID | Requisito |
+|---|---|
+| PLY-01 | El token está firmado (HMAC-SHA256) con un secreto que solo conocen el servidor de la app y el Worker. Cualquier cambio al token (carpeta, caducidad, firma) lo invalida. |
+| PLY-02 | El token caduca (4 h por defecto) y solo vale para la carpeta de **una** película: no sirve para leer otra película ni nada fuera de esa carpeta. |
+
+### Worker de video
+
+| ID | Requisito |
+|---|---|
+| PLY-03 | Sin token, con token inválido, caducado o de otra película → 403 y no se lee nada de R2. |
+| PLY-04 | Con token válido entrega `.m3u8` y `.ts` con su tipo correcto, CORS y soporte de `Range` (206). Archivo inexistente → 404. Cualquier otro tipo de archivo o ruta con `..` → 403/404, nunca se sirve. |
+| PLY-05 | Las rutas relativas de las playlists siguen funcionando: el token va en la ruta (`/t/<token>/…`), así que cada segmento lo hereda sin reescribir playlists. |
+
+### Endpoint `GET /api/playback/<movieId>`
+
+| ID | Requisito |
+|---|---|
+| PLY-06 | Sin sesión → 401. Funciona con la cookie de la web **y** con `Authorization: Bearer <access token de Supabase>` (Android). |
+| PLY-07 | Solo entrega URL si el usuario puede ver la película según RLS: publicada para cualquier usuario, borradores solo para admins. Película que no existe o que no puede ver → 404 (no revela si existe). |
+| PLY-08 | La respuesta trae `url` (URL firmada del `master.m3u8` en el Worker) y `expires_at`, con `Cache-Control: no-store`. Un usuario desactivado → 401. |
+
+### Integración con el panel
+
+| ID | Requisito |
+|---|---|
+| PLY-09 | Al guardar una película, el servidor verifica el video **a través del Worker** con un token propio (MOV-08 sigue cumpliéndose con el bucket privado). |

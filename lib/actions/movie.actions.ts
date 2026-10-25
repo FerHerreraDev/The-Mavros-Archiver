@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/guards'
 import { movieFormSchema } from '@/lib/movies'
 import { probeHlsMaster } from '@/lib/hls/remote'
+import { signedVideoBase } from '@/lib/video/playback'
 
 const MOVIES_PATH = '/dashboard/admin/movies'
 const DENIED = 'Acceso denegado. Se requieren privilegios de administrador.'
@@ -30,12 +31,17 @@ async function prepare(formData: FormData) {
     return { result: { error: 'Revisa los campos marcados.', fieldErrors: z.flattenError(parsed.error).fieldErrors } }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_VIDEO_BASE_URL
-  if (!baseUrl) {
-    return { result: { error: 'Falta NEXT_PUBLIC_VIDEO_BASE_URL en la configuración del servidor.' } }
+  // El bucket es privado: se verifica a través del Worker con un token corto (PLY-09)
+  let base: string
+  try {
+    base = (await signedVideoBase(parsed.data.hls_path, 5 * 60)).base
+  } catch (err) {
+    const message = (err as Error).message
+    const fieldErrors = message.includes('carpeta') ? { hls_path: [message] } : undefined
+    return { result: { error: fieldErrors ? 'Revisa los campos marcados.' : message, fieldErrors } }
   }
 
-  const probe = await probeHlsMaster(baseUrl, parsed.data.hls_path)
+  const probe = await probeHlsMaster(base, parsed.data.hls_path)
   if (!probe.ok) {
     return { result: { error: 'No se pudo verificar el video.', fieldErrors: { hls_path: [probe.error] } } }
   }

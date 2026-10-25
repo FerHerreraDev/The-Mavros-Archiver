@@ -10,17 +10,18 @@ import {
 import { listMoviesForAdmin } from '@/lib/data/movies'
 import { resetRequest, runAndCaptureRedirect, formData } from '../helpers/request-context'
 import { adminClient, createUser, deleteUsers, randomIp, sessionCookies, type TestUser } from '../helpers/users'
-import { startStaticServer } from '../helpers/static-server.mjs'
+import { startVideoCdn, TEST_VIDEO_SECRET } from '../helpers/video-cdn-server'
 
 let server: Server
 let boss: TestUser
 let viewer: TestUser
 
 beforeAll(async () => {
-  // "R2" local: sirve tests/fixtures/hls
-  server = await startStaticServer(path.join(__dirname, '../fixtures/hls'))
+  // Worker de video real sobre un "R2" local con tests/fixtures/hls
+  server = await startVideoCdn(path.join(__dirname, '../fixtures/hls'), TEST_VIDEO_SECRET)
   const { port } = server.address() as { port: number }
-  vi.stubEnv('NEXT_PUBLIC_VIDEO_BASE_URL', `http://127.0.0.1:${port}`)
+  vi.stubEnv('VIDEO_CDN_URL', `http://127.0.0.1:${port}`)
+  vi.stubEnv('VIDEO_TOKEN_SECRET', TEST_VIDEO_SECRET)
   ;[boss, viewer] = await Promise.all([createUser({ role: 'admin', prefix: 'mov-boss' }), createUser({ prefix: 'mov-viewer' })])
 })
 
@@ -84,6 +85,20 @@ describe('createMovieAction', () => {
 
   it('MOV-08 apuntar a una playlist de medios (no master) → error y no se guarda', async () => {
     const { result, slug } = await createAsBoss({ hls_path: 'ladder/1080p/index.m3u8' })
+    expect(result?.fieldErrors?.hls_path?.length).toBeGreaterThan(0)
+    expect(await bySlug(slug)).toBeNull()
+  })
+
+  it('PLY-09 / PLY-02 video en la raíz del bucket (sin carpeta propia) → error en hls_path, no se guarda', async () => {
+    const { result, slug } = await createAsBoss({ hls_path: 'master.m3u8' })
+    expect(result?.fieldErrors?.hls_path?.length).toBeGreaterThan(0)
+    expect(await bySlug(slug)).toBeNull()
+  })
+
+  it('PLY-09 la verificación pasa por el Worker: con otro secreto el video no se puede verificar', async () => {
+    vi.stubEnv('VIDEO_TOKEN_SECRET', 'otro-secreto-que-el-worker-no-conoce-123')
+    const { result, slug } = await createAsBoss()
+    vi.stubEnv('VIDEO_TOKEN_SECRET', TEST_VIDEO_SECRET)
     expect(result?.fieldErrors?.hls_path?.length).toBeGreaterThan(0)
     expect(await bySlug(slug)).toBeNull()
   })
