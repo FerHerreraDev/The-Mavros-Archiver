@@ -18,7 +18,7 @@
     "hls:encode": "scripts/encode-hls.sh",
     "hls:verify": "node scripts/hls-verify.mjs",
     "r2:upload": "scripts/r2-upload.sh",
-    "video:deploy": "pnpm dlx wrangler@4 deploy --config workers/video/wrangler.toml",
+    "video:deploy": "pnpm dlx wrangler@4.152.0 deploy --config workers/video/wrangler.toml",
     "video:url": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/video-url.ts"
   },
   "dependencies": {
