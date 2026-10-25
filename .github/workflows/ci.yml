@@ -42,9 +42,9 @@ jobs:
       - name: Integration + DB/RLS tests
         run: pnpm test:integration
 
-      # Chromium para la mayoría; Google Chrome (ya instalado en el runner) para reproducir H.264
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      # Chromium para la mayoría; Google Chrome para reproducir H.264 (no siempre viene en el runner)
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium chrome
 
       - name: E2E tests
         run: pnpm test:e2e
