@@ -8,7 +8,7 @@
 import { readFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
-import { parseMaster, parseMedia, validateLadder } from './hls/playlist.mjs'
+import { parseMaster, parseMedia, validateLadder } from '../lib/hls/playlist.mjs'
 
 const args = process.argv.slice(2)
 const target = args[0]

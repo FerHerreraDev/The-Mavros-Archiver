@@ -16,13 +16,7 @@ export default async function AdminPage() {
   if (!users) redirect('/dashboard')
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wide">Command Center</span>
-        <h2 className="text-2xl font-bold tracking-tight">Administración</h2>
-        <p className="text-muted-foreground">Invita personas y controla quién tiene acceso a la bóveda.</p>
-      </div>
-
+    <div className="space-y-8">
       <InviteUserForm />
       <UsersTable users={users} />
     </div>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { parseMaster, parseMedia, validateLadder } from '../../scripts/hls/playlist.mjs'
+import { parseMaster, parseMedia, validateLadder } from '@/lib/hls/playlist.mjs'
 
 const fixture = (name: string) => readFileSync(path.join(__dirname, '../fixtures/hls', name), 'utf8')
 

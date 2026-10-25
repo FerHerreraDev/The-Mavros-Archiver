@@ -163,3 +163,30 @@ Aplica a cada película que se sube a R2. Se verifica con `pnpm hls:verify` (loc
 | VID-05 | La duración total de cada calidad coincide con la del archivo original (±1 s). |
 | VID-06 | La calidad más alta conserva la resolución original, y ninguna calidad tiene más resolución que el original. |
 | VID-07 | En R2, cada playlist y cada segmento responde 200 con su tipo correcto (`application/vnd.apple.mpegurl` / `video/mp2t`) y permite CORS. |
+
+## Fase 3 — Catálogo: modelo de datos y gestión de películas
+
+Pensado para varios clientes (web y la futura app Android en Kotlin): las reglas viven en la base de datos (RLS), no solo en Server Actions.
+
+### Base de datos (`movies`)
+
+| ID | Requisito |
+|---|---|
+| MOV-01 | Un usuario autenticado ve **solo** películas publicadas; los borradores no existen para él (ni listando ni por id/slug). |
+| MOV-02 | Un admin ve todas, incluidos borradores. |
+| MOV-03 | Un visitante anónimo no ve ninguna película. |
+| MOV-04 | Solo un admin puede crear, editar o borrar películas, **desde cualquier cliente** (también con la clave pública + su sesión, como haría Android). Un `user` no puede, ni siquiera en borradores. |
+| MOV-05 | Integridad: `slug` único en formato `palabras-en-minusculas`; título obligatorio (1–200); año entre 1888 y 2100; duración > 0; `hls_path` relativo que termina en `.m3u8` (sin `http`, sin `/` inicial, sin `..`); `poster_url` https o vacío; estado `draft` o `published`. |
+| MOV-06 | Al publicar se registra `published_at`; al volver a borrador se borra. `updated_at` se actualiza solo. `created_by` queda con el admin que la creó. |
+
+### Gestión desde el panel (`/dashboard/admin/movies`)
+
+| ID | Requisito |
+|---|---|
+| MOV-07 | Un admin crea una película desde un formulario. Se guarda como borrador. Los errores de validación se muestran por campo. |
+| MOV-08 | Antes de guardar, el servidor comprueba que el `master.m3u8` existe en `VIDEO_BASE_URL + hls_path` y es un master HLS válido; si no, error claro y no se guarda. La duración se toma de la playlist (no se escribe a mano). |
+| MOV-09 | Si no se escribe slug, se genera del título (`"Chainsaw Man: Reze Arc"` → `chainsaw-man-reze-arc`). Un slug repetido da error claro. |
+| MOV-10 | Los géneros se escriben separados por comas y se guardan normalizados: minúsculas, sin espacios sobrantes, sin repetidos. |
+| MOV-11 | Un admin puede editar, publicar, despublicar y borrar. Borrar pide confirmación y no toca los archivos en R2. |
+| MOV-12 | Un `user` que entra a `/dashboard/admin/movies` vuelve a `/dashboard`; todas las acciones de películas rechazan a anónimos y `user` sin cambiar nada. |
+| MOV-13 | El panel admin tiene pestañas **Usuarios** / **Películas**. |
