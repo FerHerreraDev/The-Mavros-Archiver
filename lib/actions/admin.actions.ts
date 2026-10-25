@@ -77,7 +77,7 @@ export async function inviteUserAction(formData: FormData) {
 
     if (inviteError) {
       console.error('[ADMIN] Error invitando usuario:', inviteError.message)
-      if (inviteError.message.includes('already registered')) {
+      if (inviteError.code === 'email_exists') {
         return { error: 'Este correo ya pertenece a un usuario registrado.' }
       }
       return { error: 'Hubo un problema al enviar la invitación.' }

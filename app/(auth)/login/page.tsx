@@ -7,9 +7,14 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; redirectTo?: string }>
 }) {
-  const { error } = await searchParams
+  const { error, redirectTo } = await searchParams
 
-  return <LoginForm initialError={error ? ERROR_MESSAGES[error] : undefined} />
+  return (
+    <LoginForm
+      initialError={error ? ERROR_MESSAGES[error] : undefined}
+      redirectTo={redirectTo}
+    />
+  )
 }

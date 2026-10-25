@@ -1,5 +1,12 @@
 /node_modules
 /.next
+/.next-e2e
+
+# pruebas
+/coverage
+/playwright-report
+/test-results
+/playwright/.cache
 
 # env files (secretos). .env.example sí se versiona
 .env*
@@ -10,3 +17,6 @@
 
 # misc
 *.tsbuildinfo
+
+# lo regenera Next en cada build/dev
+next-env.d.ts

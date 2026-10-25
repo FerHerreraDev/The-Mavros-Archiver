@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { loginSchema, forgotPasswordSchema, resetPasswordSchema } from '@/lib/validations/auth.schema'
 import { getSiteUrl } from '@/lib/site-url'
+import { safeInternalPath } from '@/lib/safe-redirect'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -100,7 +101,8 @@ export async function loginAction(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  // Volver a donde iba antes de que el middleware lo mandara a /login
+  redirect(safeInternalPath(formData.get('redirectTo')))
 }
 
 /**

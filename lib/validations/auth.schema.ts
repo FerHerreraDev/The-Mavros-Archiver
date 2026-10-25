@@ -33,13 +33,14 @@ import { z } from 'zod'
 export const loginSchema = z.object({
   email: z
     .string()
+    // Normalizar ANTES de validar: si no, " a@b.co" falla el regex
+    .trim()
+    .toLowerCase()
     .min(1, 'El email es requerido')
     .regex(
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       'Email inválido'
-    )
-    .toLowerCase()
-    .trim(),
+    ),
   password: z
     .string()
     .min(1, 'La contraseña es requerida')
@@ -53,13 +54,14 @@ export const loginSchema = z.object({
 export const forgotPasswordSchema = z.object({
   email: z
     .string()
+    // Normalizar ANTES de validar: si no, " a@b.co" falla el regex
+    .trim()
+    .toLowerCase()
     .min(1, 'El email es requerido')
     .regex(
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       'Email inválido'
-    )
-    .toLowerCase()
-    .trim(),
+    ),
 })
 
 /**

@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 
 const ICON_CLASSES = "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
 
-export function LoginForm({ initialError }: { initialError?: string }) {
+export function LoginForm({ initialError, redirectTo }: { initialError?: string; redirectTo?: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(initialError ?? null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -76,6 +76,8 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       )}
 
       <form action={handleSubmit} className="space-y-4">
+        {/* El servidor valida que sea una ruta interna */}
+        {redirectTo && <input type="hidden" name="redirectTo" value={redirectTo} />}
         <fieldset disabled={isPending} className="space-y-4">
           
           <div className="space-y-2">
