@@ -1,0 +1,13 @@
+{
+  "latest": "https://cdn.test/t/v1.200.bmV3.NEWSIG/movies/peli/master.m3u8",
+  "cases": [
+    { "name": "cambia el token de un segmento, conserva la ruta", "url": "https://cdn.test/t/v1.100.b2xk.OLDSIG/movies/peli/720p/seg_00010.ts", "expected": "https://cdn.test/t/v1.200.bmV3.NEWSIG/movies/peli/720p/seg_00010.ts" },
+    { "name": "conserva el query string", "url": "https://cdn.test/t/OLD/movies/peli/720p/index.m3u8?x=1", "expected": "https://cdn.test/t/v1.200.bmV3.NEWSIG/movies/peli/720p/index.m3u8?x=1" },
+    { "name": "mismo token no cambia", "url": "https://cdn.test/t/v1.200.bmV3.NEWSIG/movies/peli/480p/seg_00001.ts", "expected": "https://cdn.test/t/v1.200.bmV3.NEWSIG/movies/peli/480p/seg_00001.ts" },
+    { "name": "otro origen se deja igual", "url": "https://otro.test/t/OLD/movies/peli/seg.ts", "expected": "https://otro.test/t/OLD/movies/peli/seg.ts" },
+    { "name": "otro puerto es otro origen", "url": "https://cdn.test:8443/t/OLD/movies/peli/seg.ts", "expected": "https://cdn.test:8443/t/OLD/movies/peli/seg.ts" },
+    { "name": "sin /t/<token>/ se deja igual", "url": "https://cdn.test/movies/peli/seg.ts", "expected": "https://cdn.test/movies/peli/seg.ts" },
+    { "name": "no es url", "url": "no es url", "expected": "no es url" }
+  ],
+  "latestWithoutToken": { "latest": "https://cdn.test/movies/peli/master.m3u8", "url": "https://cdn.test/t/OLD/movies/peli/seg.ts", "expected": "https://cdn.test/t/OLD/movies/peli/seg.ts" }
+}

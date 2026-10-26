@@ -34,3 +34,15 @@ describe('swapToken (WATCH-03)', () => {
     expect(swapToken(url, 'https://cdn.test/movies/peli/master.m3u8')).toBe(url)
   })
 })
+
+// MOB-16: los mismos casos los usa Android (core:model PlaybackRulesTest)
+import cases from '../fixtures/swap-token-cases.json'
+describe('swapToken — casos compartidos con Android', () => {
+  it.each(cases.cases)('$name', ({ url, expected }) => {
+    expect(swapToken(url, cases.latest)).toBe(expected)
+  })
+  it('URL más reciente sin token', () => {
+    const c = cases.latestWithoutToken
+    expect(swapToken(c.url, c.latest)).toBe(c.expected)
+  })
+})

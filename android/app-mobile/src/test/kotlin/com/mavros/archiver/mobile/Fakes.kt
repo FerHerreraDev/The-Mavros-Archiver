@@ -3,6 +3,9 @@ package com.mavros.archiver.mobile
 import com.mavros.archiver.core.data.AuthRepository
 import com.mavros.archiver.core.data.CatalogRepository
 import com.mavros.archiver.core.data.DataResult
+import com.mavros.archiver.core.data.PlaybackRepository
+import com.mavros.archiver.core.data.PlaybackSource
+import com.mavros.archiver.core.data.ProgressRepository
 import com.mavros.archiver.core.data.LoginError
 import com.mavros.archiver.core.data.SessionState
 import com.mavros.archiver.core.model.Catalog
@@ -61,12 +64,31 @@ class FakeCatalogRepository : CatalogRepository {
         return catalogResult
     }
 
-    override suspend fun movie(id: String): DataResult<MovieDetail?> = detailResult
+    var detailCalls = 0
+    override suspend fun movie(id: String): DataResult<MovieDetail?> { detailCalls++; return detailResult }
+}
+
+class FakePlaybackRepository(var result: DataResult<PlaybackSource?> = DataResult.Success(PlaybackSource("https://cdn.test/t/T/movies/x/master.m3u8", 0L))) : PlaybackRepository {
+    var calls = 0
+    override suspend fun source(movieId: String): DataResult<PlaybackSource?> { calls++; return result }
+}
+
+class FakeProgressRepository : ProgressRepository {
+    val writes = mutableListOf<Pair<String, Double>>()
+    private val _saved = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+    override val saved: kotlinx.coroutines.flow.SharedFlow<String> = _saved
+    override suspend fun save(movieId: String, positionSeconds: Double): DataResult<Unit> {
+        writes += movieId to positionSeconds
+        _saved.emit(movieId)
+        return DataResult.Success(Unit)
+    }
 }
 
 class FakeContainer(
     override val auth: FakeAuthRepository = FakeAuthRepository(),
     override val catalog: FakeCatalogRepository = FakeCatalogRepository(),
+    override val playback: FakePlaybackRepository = FakePlaybackRepository(),
+    override val progress: FakeProgressRepository = FakeProgressRepository(),
 ) : AppContainer {
     override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 }

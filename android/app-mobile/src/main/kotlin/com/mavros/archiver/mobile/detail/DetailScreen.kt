@@ -31,6 +31,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.mavros.archiver.core.model.Movie
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,9 +54,15 @@ import com.mavros.archiver.mobile.ui.DetailSkeleton
 import com.mavros.archiver.mobile.ui.PosterImage
 
 @Composable
-fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (startAt: Double) -> Unit) {
+fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    DetailContent(state, onBack, onPlay, viewModel::retry)
+    // Al volver del reproductor, el botón muestra el progreso nuevo (MOB-19)
+    var resumed by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        if (resumed) viewModel.refresh() else resumed = true
+        onPauseOrDispose { }
+    }
+    DetailContent(state, onBack, { start -> (state as? DetailUiState.Content)?.detail?.movie?.let { onPlay(it, start) } }, viewModel::retry)
 }
 
 /** Texto del botón según el progreso (MOB-08, reglas de PRG-02) */

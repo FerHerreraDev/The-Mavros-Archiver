@@ -344,6 +344,20 @@ Proyecto Kotlin en `android/`. Habla con el mismo backend que la web (Supabase c
 | MOB-11 | Todo texto de la app se lee contra el fondo (mismo criterio que UI-02: contraste WCAG AA). |
 | MOB-10 | Las reglas de progreso (`resumePosition`, `isInProgress`) dan exactamente los mismos resultados que las de la web. |
 
+## Fase A3 — Reproductor nativo en Android (Media3)
+
+Mismas reglas que la web (PLY, WATCH, PRG), con el reproductor del sistema. La lógica pura vive en `core:model` y se prueba con los mismos casos que la web.
+
+| ID | Requisito |
+|---|---|
+| MOB-13 | "Reproducir" / "Continuar desde" abre el reproductor a pantalla completa (horizontal) con el video HLS. La URL se pide a `/api/playback/<id>` con `Authorization: Bearer <access token>` (PLY-06); arranca en la posición de PRG-02. Sin sesión válida → login; película no disponible → mensaje, nunca un crash. |
+| MOB-14 | Controles: reproducir/pausa, ±10 s, barra de tiempo, título y **calidad** (Automática o una resolución disponible). La pantalla no se apaga mientras se reproduce. |
+| MOB-15 | El progreso se guarda igual que en la web (PRG-01): cada ~10 s mientras reproduce, al pausar y al salir (atrás, cerrar la app, pasar a segundo plano). Salir **nunca** guarda 0 ni retrocede el progreso por no haber arrancado aún (PRG-06). La posición se guarda dentro de 0…duración. |
+| MOB-16 | El token del video se renueva solo: 5 min antes de caducar y ante cualquier 403 del Worker se pide una URL nueva y el video sigue en el mismo punto, sin acción del usuario (WATCH-03). Cambiar el token en una URL sigue la misma regla que la web (`swapToken`, casos compartidos). |
+| MOB-17 | Salir a inicio mientras reproduce pasa a **Picture-in-Picture** (ventana flotante) y el video sigue. |
+| MOB-18 | Controles en la pantalla de bloqueo y en la notificación de medios (reproducir/pausa, título) mientras hay reproducción. |
+| MOB-19 | Al volver del reproductor, el detalle y "Seguir viendo" muestran el progreso nuevo. |
+
 ## Estados de carga (web y Android)
 
 | ID | Requisito |

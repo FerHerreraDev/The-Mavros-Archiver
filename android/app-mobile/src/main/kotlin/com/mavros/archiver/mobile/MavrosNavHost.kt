@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import com.mavros.archiver.mobile.player.PlayerActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
@@ -53,7 +55,7 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
     val nav = rememberNavController()
     NavHost(nav, startDestination = CatalogRoute) {
         composable<CatalogRoute> {
-            val vm: CatalogViewModel = viewModel(factory = viewModelFactory { initializer { CatalogViewModel(container.catalog) } })
+            val vm: CatalogViewModel = viewModel(factory = viewModelFactory { initializer { CatalogViewModel(container.catalog, container.progress) } })
             CatalogScreen(
                 viewModel = vm,
                 onOpenMovie = { nav.navigate(DetailRoute(it)) },
@@ -61,9 +63,14 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
             )
         }
         composable<DetailRoute> { entry ->
+            val context = LocalContext.current
             val movieId = entry.toRoute<DetailRoute>().movieId
-            val vm: DetailViewModel = viewModel(key = movieId, factory = viewModelFactory { initializer { DetailViewModel(container.catalog, movieId) } })
-            DetailScreen(viewModel = vm, onBack = { nav.popBackStack() }, onPlay = { /* Reproductor: fase A3 */ })
+            val vm: DetailViewModel = viewModel(key = movieId, factory = viewModelFactory { initializer { DetailViewModel(container.catalog, movieId, container.progress) } })
+            DetailScreen(
+                viewModel = vm,
+                onBack = { nav.popBackStack() },
+                onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
+            )
         }
         composable<ProfileRoute> {
             ProfileScreen(

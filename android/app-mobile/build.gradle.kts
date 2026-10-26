@@ -99,6 +99,11 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.session)
+    implementation(libs.media3.ui)
+    implementation(libs.kotlinx.coroutines.guava)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)

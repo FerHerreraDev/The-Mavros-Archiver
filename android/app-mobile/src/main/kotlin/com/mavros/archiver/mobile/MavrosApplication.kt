@@ -3,6 +3,10 @@ package com.mavros.archiver.mobile
 import android.app.Application
 import com.mavros.archiver.core.data.AuthRepository
 import com.mavros.archiver.core.data.CatalogRepository
+import com.mavros.archiver.core.data.HttpPlaybackRepository
+import com.mavros.archiver.core.data.PlaybackRepository
+import com.mavros.archiver.core.data.ProgressRepository
+import com.mavros.archiver.core.data.SupabaseProgressRepository
 import com.mavros.archiver.core.data.MavrosConfig
 import com.mavros.archiver.core.data.SupabaseAuthRepository
 import com.mavros.archiver.core.data.SupabaseCatalogRepository
@@ -16,6 +20,8 @@ import kotlinx.coroutines.SupervisorJob
 interface AppContainer {
     val auth: AuthRepository
     val catalog: CatalogRepository
+    val playback: PlaybackRepository
+    val progress: ProgressRepository
 
     /** Alcance de toda la app: el logout no se cancela aunque la pantalla desaparezca */
     val appScope: CoroutineScope
@@ -32,6 +38,8 @@ class DefaultAppContainer(app: Application) : AppContainer {
 
     override val auth: AuthRepository = SupabaseAuthRepository(supabase, appScope)
     override val catalog: CatalogRepository = SupabaseCatalogRepository(supabase, auth)
+    override val playback: PlaybackRepository = HttpPlaybackRepository(config, supabase, auth)
+    override val progress: ProgressRepository = SupabaseProgressRepository(supabase)
 }
 
 class MavrosApplication : Application() {

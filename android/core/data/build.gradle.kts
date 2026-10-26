@@ -17,7 +17,7 @@ dependencies {
     api(platform(libs.supabase.bom))
     api(libs.supabase.auth)
     api(libs.supabase.postgrest)
-    implementation(libs.ktor.client.okhttp)
+    api(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)
     api(libs.kotlinx.coroutines.core)
 
@@ -25,6 +25,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    testImplementation(libs.ktor.client.mock)
 }
 
 // Pruebas rápidas: todo menos el paquete integration

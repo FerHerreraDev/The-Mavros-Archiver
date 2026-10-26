@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mavros.archiver.core.data.CatalogRepository
 import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.data.DataResult
+import com.mavros.archiver.core.data.ProgressRepository
 import com.mavros.archiver.core.model.Catalog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,13 +20,17 @@ sealed interface CatalogUiState {
     data class Content(val catalog: Catalog, val genre: String?) : CatalogUiState
 }
 
-class CatalogViewModel(private val repository: CatalogRepository) : ViewModel() {
+class CatalogViewModel(private val repository: CatalogRepository, progress: ProgressRepository? = null) : ViewModel() {
     private val _state = MutableStateFlow<CatalogUiState>(CatalogUiState.Loading)
     val state: StateFlow<CatalogUiState> = _state
     private var genre: String? = null
     private var job: Job? = null
 
-    init { load() }
+    init {
+        load()
+        // "Seguir viendo" al día cuando el reproductor termina de guardar (MOB-19)
+        progress?.let { p -> viewModelScope.launch { p.saved.collect { refresh() } } }
+    }
 
     fun selectGenre(value: String?) {
         genre = value
