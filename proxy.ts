@@ -58,7 +58,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // Rutas protegidas que requieren autenticación
-  const isProtectedRoute = pathname.startsWith('/dashboard')
+  const isProtectedRoute =
+    pathname.startsWith('/dashboard') || pathname === '/link' || pathname.startsWith('/link/')
   const isSetPasswordRoute = pathname.startsWith('/set-password')
 
   // Rutas de autenticación (no hay registro público: acceso solo por invitación)
@@ -70,7 +71,8 @@ export async function proxy(request: NextRequest) {
 
   // Si intenta acceder a ruta protegida sin estar autenticado
   if ((isProtectedRoute || isSetPasswordRoute) && !user) {
-    return redirectTo('/login', isProtectedRoute ? { redirectTo: pathname } : undefined)
+    // Se conserva el query (ej. /link?code=…) para volver exactamente ahí tras el login
+    return redirectTo('/login', isProtectedRoute ? { redirectTo: pathname + request.nextUrl.search } : undefined)
   }
 
   // Invitado sin contraseña: primero /set-password

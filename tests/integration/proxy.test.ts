@@ -47,6 +47,12 @@ describe('proxy sin sesión', () => {
     expect(location?.searchParams.get('redirectTo')).toBe(path)
   })
 
+  it('DEV-03 /link sin sesión → /login conservando el código en redirectTo', async () => {
+    const { location } = await visit('/link?code=K7Q4-MX2P')
+    expect(location?.pathname).toBe('/login')
+    expect(location?.searchParams.get('redirectTo')).toBe('/link?code=K7Q4-MX2P')
+  })
+
   it('ACC-04 /set-password → /login', async () => {
     const { location } = await visit('/set-password')
     expect(location?.pathname).toBe('/login')
@@ -75,6 +81,11 @@ describe('proxy con sesión', () => {
     expect(location?.pathname).toBe('/dashboard')
   })
 
+  it('DEV-03 /link con sesión pasa', async () => {
+    const { location } = await visit('/link?code=K7Q4-MX2P', userCookies)
+    expect(location).toBeNull()
+  })
+
   it('/set-password es accesible con sesión (recuperación)', async () => {
     const { location } = await visit('/set-password', userCookies)
     expect(location).toBeNull()
@@ -82,7 +93,7 @@ describe('proxy con sesión', () => {
 })
 
 describe('proxy: invitado sin contraseña', () => {
-  it.each(['/dashboard', '/dashboard/profile', '/login', '/forgot-password'])('ACC-05 %s → /set-password', async (path) => {
+  it.each(['/dashboard', '/dashboard/profile', '/login', '/forgot-password', '/link'])('ACC-05 / DEV-03 %s → /set-password', async (path) => {
     const { location } = await visit(path, invitedCookies)
     expect(location?.pathname).toBe('/set-password')
   })

@@ -148,6 +148,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 
 | ID | Requisito |
 |---|---|
+| UI-02 | Todo texto visible tiene contraste legible contra el fondo (WCAG AA: ≥ 4.5 para texto normal, ≥ 3 para texto grande) en las páginas de acceso (`/login`, `/forgot-password`, `/link`). |
 | UI-01 | En un teléfono (390 px de ancho) ninguna página (login, catálogo, reproducción, perfil, admin y películas) tiene scroll horizontal; los enlaces del navbar siguen accesibles por nombre. |
 
 ## Contenido — pipeline de video (HLS)
@@ -275,3 +276,38 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | OPS-06 | Un error inesperado en el dashboard muestra una página de error propia con "Reintentar", sin filtrar detalles técnicos al usuario. |
 | OPS-07 | Todas las respuestas llevan headers de seguridad: no se puede incrustar la app en un iframe (`X-Frame-Options: DENY` y `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restrictiva y HSTS. |
 | OPS-08 | Next 16: el control de rutas usa la convención `proxy` (no la obsoleta `middleware`), con el mismo comportamiento (ACC-01..ACC-06 siguen pasando). |
+
+## Fase A1 — Login por código para la TV (Device Authorization Grant, RFC 8628)
+
+La tele pide un código, el usuario lo aprueba desde un teléfono/computadora con sesión, y la tele recibe una sesión de Supabase de ese usuario. Desde ahí usa RLS y `/api/playback` (Bearer) como cualquier cliente.
+
+### Pedir código (`POST /api/device/code`)
+
+| ID | Requisito |
+|---|---|
+| DEV-01 | Sin sesión, devuelve `device_code` (secreto, ≥ 256 bits aleatorios), `user_code` de 8 caracteres en formato `XXXX-XXXX` con un alfabeto sin caracteres confundibles (sin `0 O 1 I L`), `verification_uri` (`<sitio>/link`), `verification_uri_complete` (con el código), `expires_in` = 600 y `interval` = 5. Está limitado por IP. |
+
+### Sondeo (`POST /api/device/token` con `{ device_code }`)
+
+| ID | Requisito |
+|---|---|
+| DEV-02 | Antes de aprobar → 400 `authorization_pending`. Si sondea más rápido que `interval` → 400 `slow_down`. `device_code` desconocido o basura → 400 `invalid_grant`. Código caducado → 400 `expired_token`. |
+| DEV-04 | Tras aprobar, el siguiente sondeo devuelve 200 con `access_token`, `refresh_token`, `expires_at` y el usuario; la sesión es de **quien aprobó** y funciona (el access token identifica a ese usuario y el refresh token renueva). Se entrega **una sola vez**: sondeos posteriores → `invalid_grant`, también si llegan dos a la vez. |
+| DEV-05 | Si el usuario rechaza → `access_denied`, y ese código ya no se puede aprobar. |
+| DEV-08 | Si el usuario que aprobó está desactivado cuando la tele sondea → `access_denied`, sin sesión. |
+
+### Aprobar (`/link`)
+
+| ID | Requisito |
+|---|---|
+| DEV-03 | `/link` requiere sesión; sin sesión lleva a `/login` y, tras entrar, vuelve a `/link` **con el código** (`?code=` se conserva). Un invitado sin contraseña va antes a `/set-password`. El código se acepta con o sin guion, en minúsculas o con espacios. |
+| DEV-06 | Solo se aprueba un código pendiente y vigente; uno caducado, ya aprobado, rechazado o usado da un error claro y no cambia nada (un segundo usuario no puede "robar" un código ya aprobado). |
+| DEV-10 | Antes de aprobar se muestra qué dispositivo lo pide y hace cuánto, con el aviso de aprobar solo si el código aparece en **tu propia pantalla**. |
+| DEV-11 | Aprobar/rechazar está limitado por usuario (5 por minuto) para que no se puedan adivinar códigos. |
+
+### Seguridad de los datos
+
+| ID | Requisito |
+|---|---|
+| DEV-07 | Los clientes (anónimos o con sesión) no pueden leer ni escribir los códigos ni llamar sus funciones. La base guarda solo el **hash** del `device_code`: aunque se filtrara la tabla, no se podría canjear. |
+| DEV-09 | La sesión de la tele es una sesión normal: respeta RLS (un `user` ve publicadas, no borradores) y sirve para `/api/playback` con Bearer. |
