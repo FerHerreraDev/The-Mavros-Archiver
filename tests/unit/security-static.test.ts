@@ -47,3 +47,27 @@ describe('SEC-03 el cliente admin (service role) es solo de servidor', () => {
     expect(clientSide.map((f) => path.relative(root, f))).toEqual([])
   })
 })
+
+describe('MOB-01 la app Android no lleva secretos', () => {
+  const androidDir = path.join(root, 'android')
+  const files = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const full = path.join(dir, name)
+      if (['build', '.gradle', '.kotlin', 'test', 'androidTest'].includes(name)) return []
+      if (statSync(full).isDirectory()) return files(full)
+      return /\.(kt|kts|xml|properties|toml|pro)$/.test(name) ? [full] : []
+    })
+
+  it('ni el código ni la configuración de la app mencionan la service role key ni el secreto del video', () => {
+    const offenders = files(androidDir).filter((f) =>
+      /service_role|SERVICE_ROLE|VIDEO_TOKEN_SECRET|sb_secret_/.test(readFileSync(f, 'utf8'))
+    )
+    expect(offenders.map((f) => path.relative(root, f))).toEqual([])
+  })
+
+  it('de .env.local la app solo lee las dos variables públicas', () => {
+    const gradle = readFileSync(path.join(androidDir, 'app-mobile/build.gradle.kts'), 'utf8')
+    const allowed = gradle.match(/val allowed = setOf\(([^)]*)\)/)?.[1] ?? ''
+    expect(allowed.replace(/\s/g, '')).toBe('"NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY"')
+  })
+})

@@ -1,0 +1,76 @@
+package com.mavros.archiver.mobile
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import com.mavros.archiver.core.data.SessionState
+import com.mavros.archiver.mobile.catalog.CatalogScreen
+import com.mavros.archiver.mobile.catalog.CatalogViewModel
+import com.mavros.archiver.mobile.detail.DetailScreen
+import com.mavros.archiver.mobile.detail.DetailViewModel
+import com.mavros.archiver.mobile.login.LoginScreen
+import com.mavros.archiver.mobile.login.LoginViewModel
+import com.mavros.archiver.mobile.profile.ProfileScreen
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+
+@Serializable data object CatalogRoute
+@Serializable data class DetailRoute(val movieId: String)
+@Serializable data object ProfileRoute
+
+/**
+ * Sin sesión solo existe el login; con sesión, catálogo/detalle/perfil.
+ * Si la sesión se pierde (logout, revocada, MOB-06) la app vuelve sola al login.
+ */
+@Composable
+fun MavrosNavHost(container: AppContainer) {
+    val session by container.auth.session.collectAsStateWithLifecycle()
+
+    when (val state = session) {
+        SessionState.Loading -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        SessionState.SignedOut -> {
+            val vm: LoginViewModel = viewModel(factory = viewModelFactory { initializer { LoginViewModel(container.auth) } })
+            LoginScreen(vm)
+        }
+        is SessionState.SignedIn -> SignedInGraph(container, state)
+    }
+}
+
+@Composable
+private fun SignedInGraph(container: AppContainer, session: SessionState.SignedIn) {
+    val nav = rememberNavController()
+    NavHost(nav, startDestination = CatalogRoute) {
+        composable<CatalogRoute> {
+            val vm: CatalogViewModel = viewModel(factory = viewModelFactory { initializer { CatalogViewModel(container.catalog) } })
+            CatalogScreen(
+                viewModel = vm,
+                onOpenMovie = { nav.navigate(DetailRoute(it)) },
+                onOpenProfile = { nav.navigate(ProfileRoute) },
+            )
+        }
+        composable<DetailRoute> { entry ->
+            val movieId = entry.toRoute<DetailRoute>().movieId
+            val vm: DetailViewModel = viewModel(key = movieId, factory = viewModelFactory { initializer { DetailViewModel(container.catalog, movieId) } })
+            DetailScreen(viewModel = vm, onBack = { nav.popBackStack() }, onPlay = { /* Reproductor: fase A3 */ })
+        }
+        composable<ProfileRoute> {
+            ProfileScreen(
+                email = session.email,
+                onBack = { nav.popBackStack() },
+                onSignOut = { container.appScope.launch { container.auth.signOut() } },
+            )
+        }
+    }
+}

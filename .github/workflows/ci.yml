@@ -56,3 +56,56 @@ jobs:
           name: playwright-report
           path: playwright-report
           retention-days: 7
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Supabase CLI (node_modules) para las pruebas de integración de core:data
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit + Robolectric
+        run: ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest --console=plain
+
+      - name: Start local Supabase
+        run: pnpm db:start
+        working-directory: .
+
+      - name: Integration (core:data vs local Supabase)
+        run: ./gradlew :core:data:integrationTest --console=plain
+
+      - name: Build APKs and scan for server secrets (MOB-01)
+        run: |
+          ./gradlew :app-mobile:assembleLocalDebug :app-mobile:assembleProdDebug --console=plain
+          for apk in app-mobile/build/outputs/apk/*/debug/*.apk; do scripts/check-apk-secrets.sh "$apk"; done
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: |
+            android/**/build/reports/tests
+          retention-days: 7

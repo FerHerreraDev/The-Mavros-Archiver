@@ -311,3 +311,33 @@ La tele pide un código, el usuario lo aprueba desde un teléfono/computadora co
 |---|---|
 | DEV-07 | Los clientes (anónimos o con sesión) no pueden leer ni escribir los códigos ni llamar sus funciones. La base guarda solo el **hash** del `device_code`: aunque se filtrara la tabla, no se podría canjear. |
 | DEV-09 | La sesión de la tele es una sesión normal: respeta RLS (un `user` ve publicadas, no borradores) y sirve para `/api/playback` con Bearer. |
+
+## Fase A2 — App Android (teléfono): base, login y catálogo
+
+Proyecto Kotlin en `android/`. Habla con el mismo backend que la web (Supabase con la clave pública + RLS). Las pruebas JVM de integración corren contra el Supabase **local**, igual que las de la web.
+
+### Configuración y seguridad
+
+| ID | Requisito |
+|---|---|
+| MOB-01 | La app solo lleva la URL de Supabase, la clave **pública** y la URL del sitio. Ni la service role key ni el secreto del token de video aparecen en el código, en la configuración ni en el APK. |
+| MOB-02 | Hay dos entornos: `local` (emulador → Supabase local por `10.0.2.2`, único lugar donde se permite HTTP sin cifrar) y `prod` (HTTPS a producción). |
+
+### Sesión
+
+| ID | Requisito |
+|---|---|
+| MOB-03 | Login con email y contraseña. Validación previa igual que la web (email válido, contraseña ≥ 8). Credenciales incorrectas, usuario desactivado o invitado sin contraseña → el mismo mensaje genérico, sin revelar si la cuenta existe. |
+| MOB-04 | La sesión se guarda en el almacenamiento privado de la app: al cerrar y abrir la app sigue dentro, sin volver a pedir contraseña. |
+| MOB-05 | Cerrar sesión borra la sesión guardada y vuelve al login. |
+| MOB-06 | Si la sesión deja de ser válida (usuario desactivado, sesiones revocadas), la app vuelve al login sola. |
+
+### Catálogo y detalle
+
+| ID | Requisito |
+|---|---|
+| MOB-07 | El catálogo muestra solo películas publicadas (aunque el usuario sea admin), las más recientes primero; "Seguir viendo" con las que van entre 5 % y 95 %, la más reciente primero; filtro por género. Mismas reglas que CAT-01..CAT-06. |
+| MOB-08 | El detalle muestra póster, título, año, duración, géneros y sinopsis, y un botón "Reproducir" o "Continuar desde mm:ss" según el progreso (reglas de PRG-02). Un borrador o un id inexistente → "no disponible". |
+| MOB-09 | Sin conexión o con error del servidor, cada pantalla muestra un error claro con "Reintentar" (nunca se queda cargando para siempre ni se cierra la app). |
+| MOB-11 | Todo texto de la app se lee contra el fondo (mismo criterio que UI-02: contraste WCAG AA). |
+| MOB-10 | Las reglas de progreso (`resumePosition`, `isInProgress`) dan exactamente los mismos resultados que las de la web. |

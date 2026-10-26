@@ -18,6 +18,9 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "test-results/**",
     "coverage/**",
+    // Proyecto Android: lo revisa Gradle; aquí solo se lintean sus scripts .mjs
+    "android/**/build/**",
+    "android/.gradle/**",
   ]),
 ]);
 
