@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -23,6 +25,15 @@ fun prodValue(name: String) = (findProperty("mavros.$name") as String?) ?: publi
 val localAnonKey =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
 
+/**
+ * Firma de PRODUCCIÓN (release): la llave es del dueño y vive FUERA del repositorio, en
+ * ~/.mavros/keystore.properties (storeFile, storePassword, keyAlias, keyPassword). Nunca se sube.
+ * Sin ese archivo, prodRelease no se puede compilar (ver la tarea de verificación abajo).
+ */
+val releaseKeys: Properties? = File(System.getProperty("user.home"), ".mavros/keystore.properties")
+    .takeIf { it.exists() }
+    ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+
 android {
     namespace = "com.mavros.archiver.tv"
     compileSdk = 37
@@ -32,8 +43,19 @@ android {
         applicationId = "com.mavros.archiver.tv"
         minSdk = 28 // Android TV 9+: cualquier Google TV
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0"
+    }
+
+    signingConfigs {
+        releaseKeys?.let { keys ->
+            create("release") {
+                storeFile = file(keys.getProperty("storeFile"))
+                storePassword = keys.getProperty("storePassword")
+                keyAlias = keys.getProperty("keyAlias")
+                keyPassword = keys.getProperty("keyPassword")
+            }
+        }
     }
 
     flavorDimensions += "env"
@@ -43,6 +65,8 @@ android {
             dimension = "env"
             applicationIdSuffix = ".local"
             versionNameSuffix = "-local"
+            // Solo emuladores: el release optimizado se firma con la llave de prueba para poder verificarlo
+            signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "SUPABASE_URL", "\"http://10.0.2.2:54321\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$localAnonKey\"")
             // -Pmavros.localSiteUrl=… si el 3000 está ocupado (p. ej. un `next dev` contra producción)
@@ -50,6 +74,7 @@ android {
         }
         create("prod") {
             dimension = "env"
+            releaseKeys?.let { signingConfig = signingConfigs.getByName("release") }
             buildConfigField("String", "SUPABASE_URL", "\"${prodValue("NEXT_PUBLIC_SUPABASE_URL")}\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"${prodValue("NEXT_PUBLIC_SUPABASE_ANON_KEY")}\"")
             buildConfigField("String", "SITE_URL", "\"https://the-mavros-archiver.vercel.app\"")
@@ -111,4 +136,13 @@ dependencies {
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+// prodRelease sin la llave del dueño saldría sin firmar (no instalable): mejor fallar con instrucciones
+tasks.matching { it.name == "assembleProdRelease" || it.name == "packageProdRelease" }.configureEach {
+    doFirst {
+        check(releaseKeys != null) {
+            "Falta ~/.mavros/keystore.properties con tu llave de firma. Créala con android/scripts/create-release-key.sh"
+        }
+    }
 }

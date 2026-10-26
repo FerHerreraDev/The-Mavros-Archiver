@@ -16,6 +16,9 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 ADB="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 PORT=3002
+# BUILD=release prueba la versión optimizada (R8) firmada con la llave de prueba del flavor local
+BUILD="${BUILD:-debug}"
+VARIANT="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD:0:1}")${BUILD:1}"
 PKG=com.mavros.archiver.tv.local
 OUT="$(mktemp -d)"
 
@@ -36,8 +39,9 @@ for i in $(seq 1 40); do curl -sf -o /dev/null "http://localhost:$PORT/login" &&
 node android/scripts/e2e-tv-seed.mjs seed "$OUT/seed.json"
 
 echo "Compilando e instalando…"
-(cd android && ./gradlew :app-tv:assembleLocalDebug -Pmavros.localSiteUrl=http://10.0.2.2:$PORT -q)
-"$ADB" install -r android/app-tv/build/outputs/apk/local/debug/app-tv-local-debug.apk >/dev/null
+(cd android && ./gradlew :app-tv:assembleLocal$VARIANT -Pmavros.localSiteUrl=http://10.0.2.2:$PORT -q)
+"$ADB" uninstall $PKG >/dev/null 2>&1 || true # debug y release tienen distinta firma
+"$ADB" install android/app-tv/build/outputs/apk/local/$BUILD/app-tv-local-$BUILD.apk >/dev/null
 "$ADB" shell pm clear $PKG >/dev/null # empieza sin sesión
 "$ADB" shell am start -n $PKG/com.mavros.archiver.tv.TvActivity >/dev/null
 
@@ -62,4 +66,4 @@ sleep 3
 POS=$(node android/scripts/e2e-tv-seed.mjs progress "$OUT/seed.json")
 awk -v p="$POS" 'BEGIN { exit !(p > 0) }' || { echo "✗ TV-06 no se guardó progreso ($POS)"; exit 1; }
 echo "✓ TV-06 reprodujo el HLS real y al salir guardó el progreso: ${POS}s"
-echo "✓ Prueba de la tele superada"
+echo "✓ Prueba de la tele superada ($BUILD)"

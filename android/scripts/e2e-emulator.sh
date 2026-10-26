@@ -35,9 +35,12 @@ echo "Usando $ANDROID_SERIAL"
 until adb -s "$ANDROID_SERIAL" shell pm path android >/dev/null 2>&1; do sleep 2; done
 
 echo "Compilando APKs…"
-(cd "$ROOT/android" && ./gradlew :app-mobile:assembleLocalDebug :app-mobile:assembleLocalDebugAndroidTest --console=plain -q)
-adb install -r "$ROOT/android/app-mobile/build/outputs/apk/local/debug/app-mobile-local-debug.apk" >/dev/null
-adb install -r -t "$ROOT/android/app-mobile/build/outputs/apk/androidTest/local/debug/app-mobile-local-debug-androidTest.apk" >/dev/null
+# BUILD=release prueba la versión optimizada (R8), firmada con la llave de prueba del flavor local
+BUILD="${BUILD:-debug}"
+VARIANT="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD:0:1}")${BUILD:1}"
+(cd "$ROOT/android" && ./gradlew :app-mobile:assembleLocal$VARIANT :app-mobile:assembleLocal${VARIANT}AndroidTest -Pmavros.testBuildType=$BUILD --console=plain -q)
+adb install -r "$ROOT/android/app-mobile/build/outputs/apk/local/$BUILD/app-mobile-local-$BUILD.apk" >/dev/null
+adb install -r -t "$ROOT/android/app-mobile/build/outputs/apk/androidTest/local/$BUILD/app-mobile-local-$BUILD-androidTest.apk" >/dev/null
 # Empezar sin sesión guardada de corridas anteriores
 adb shell pm clear "$APP_ID" >/dev/null
 
