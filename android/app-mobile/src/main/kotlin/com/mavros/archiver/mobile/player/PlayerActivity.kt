@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Rational
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +44,7 @@ import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.ListenableFuture
 import com.mavros.archiver.core.design.MavrosTheme
 import com.mavros.archiver.core.model.Movie
+import com.mavros.archiver.mobile.MainActivity
 import com.mavros.archiver.mobile.MavrosApplication
 
 /**
@@ -125,7 +127,7 @@ class PlayerActivity : ComponentActivity() {
                     qualities = qualityLabels(videoHeights),
                     selectedQuality = selectedHeight,
                     onSelectQuality = ::selectQuality,
-                    onBack = { finish() },
+                    onBack = ::leave,
                     onRetry = {
                         if (state is PlayerUiState.Ready && playbackFailed) {
                             playbackFailed = false
@@ -155,6 +157,16 @@ class PlayerActivity : ComponentActivity() {
             }
         }
         updatePipParams(false)
+        onBackPressedDispatcher.addCallback(this) { leave() }
+    }
+
+    /**
+     * El reproductor vive en su propia tarea (necesario para PiP y para abrirlo desde la
+     * notificación): al salir se trae al frente la tarea de la app, con el detalle como estaba.
+     */
+    private fun leave() {
+        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        finish()
     }
 
     override fun onStart() {

@@ -354,7 +354,7 @@ Mismas reglas que la web (PLY, WATCH, PRG), con el reproductor del sistema. La l
 | MOB-14 | Controles: reproducir/pausa, ±10 s, barra de tiempo, título y **calidad** (Automática o una resolución disponible). La pantalla no se apaga mientras se reproduce. |
 | MOB-15 | El progreso se guarda igual que en la web (PRG-01): cada ~10 s mientras reproduce, al pausar y al salir (atrás, cerrar la app, pasar a segundo plano). Salir **nunca** guarda 0 ni retrocede el progreso por no haber arrancado aún (PRG-06). La posición se guarda dentro de 0…duración. |
 | MOB-16 | El token del video se renueva solo: 5 min antes de caducar y ante cualquier 403 del Worker se pide una URL nueva y el video sigue en el mismo punto, sin acción del usuario (WATCH-03). Cambiar el token en una URL sigue la misma regla que la web (`swapToken`, casos compartidos). |
-| MOB-17 | Salir a inicio mientras reproduce pasa a **Picture-in-Picture** (ventana flotante) y el video sigue. |
+| MOB-17 | Salir a inicio mientras reproduce pasa a **Picture-in-Picture** (ventana flotante) y el video sigue. Tocar la notificación de medios abre el reproductor a pantalla completa, también si estaba en PiP. |
 | MOB-18 | Controles en la pantalla de bloqueo y en la notificación de medios (reproducir/pausa, título) mientras hay reproducción. |
 | MOB-19 | Al volver del reproductor, el detalle y "Seguir viendo" muestran el progreso nuevo. |
 

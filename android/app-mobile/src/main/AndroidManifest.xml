@@ -29,7 +29,9 @@
         <activity
             android:name=".player.PlayerActivity"
             android:exported="false"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.mavros.archiver.player"
+            android:excludeFromRecents="true"
             android:screenOrientation="sensorLandscape"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
