@@ -59,9 +59,26 @@ echo "✓ TV-02 aprobado en el 'teléfono': la tele entró sola al catálogo"
 wait_text 'text="Reproducir"'
 echo "✓ TV-05 OK abre el detalle con Reproducir"
 "$ADB" shell input keyevent KEYCODE_DPAD_CENTER
-sleep 8
+# El video de prueba dura 12 s: todo lo que mira si sigue reproduciendo pasa antes de que termine
+sleep 4
 "$ADB" shell dumpsys activity activities | grep -q "topResumedActivity=.*TvPlayerActivity" || { echo "✗ No abrió el reproductor"; exit 1; }
-"$ADB" shell input keyevent KEYCODE_BACK
+
+# TV-06: OK muestra los controles (sin pausar); → → llega a Calidad; OK abre la lista
+"$ADB" shell input keyevent KEYCODE_DPAD_CENTER; sleep 1
+ui | grep -q 'content-desc="Pausar"' || { echo "✗ TV-06 OK no mostró los controles (o pausó). En pantalla: $(grep -oE 'content-desc="[^"]+"|text="[^"]+"' "$OUT/ui.xml" | tr '\n' ' ')"; exit 1; }
+# ← enfoca ⏪ y OK lo activa: vuelve al inicio (el video de prueba es corto) y prueba ese botón
+"$ADB" shell input keyevent KEYCODE_DPAD_LEFT; "$ADB" shell input keyevent KEYCODE_DPAD_CENTER
+# ⏪ → ⏯ → ⏩ → Calidad
+"$ADB" shell input keyevent KEYCODE_DPAD_RIGHT; "$ADB" shell input keyevent KEYCODE_DPAD_RIGHT; "$ADB" shell input keyevent KEYCODE_DPAD_RIGHT
+"$ADB" shell input keyevent KEYCODE_DPAD_CENTER; sleep 1
+wait_text 'text="Automática"'
+"$ADB" shell input keyevent KEYCODE_BACK; sleep 1   # cierra la lista
+# La lista es otra ventana: al cerrarla, el botón debe seguir diciendo "Pausar" (nada pausó el video)
+ui | grep -q 'content-desc="Pausar"' || { echo "✗ TV-06 abrir Calidad pausó el video. En pantalla: $(grep -oE 'content-desc="[^"]+"|text="[^"]+"' "$OUT/ui.xml" | tr '\n' ' ')"; exit 1; }
+echo "✓ TV-06 OK muestra los controles y Calidad abre la lista sin pausar"
+"$ADB" shell input keyevent KEYCODE_BACK; sleep 1   # oculta los controles
+"$ADB" shell dumpsys activity activities | grep -q "topResumedActivity=.*TvPlayerActivity" || { echo "✗ TV-06 Atrás salió en vez de ocultar"; exit 1; }
+"$ADB" shell input keyevent KEYCODE_BACK            # ahora sí sale
 sleep 3
 POS=$(node android/scripts/e2e-tv-seed.mjs progress "$OUT/seed.json")
 awk -v p="$POS" 'BEGIN { exit !(p > 0) }' || { echo "✗ TV-06 no se guardó progreso ($POS)"; exit 1; }

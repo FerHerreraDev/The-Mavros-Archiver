@@ -371,7 +371,7 @@ App aparte (`app-tv`) para Google TV / Android TV 9+, con la misma lógica que e
 | TV-03 | Código caducado o rechazado → pide uno nuevo solo y avisa por qué ("El código caducó", "Se rechazó"). Sin red → lo dice y reintenta solo. |
 | TV-04 | Catálogo en filas: "Seguir viendo" (con barra de progreso), "Recién agregadas" y una por género. Se recorre con las flechas; la tarjeta enfocada se agranda y se resalta. Skeleton mientras carga (LOAD-01). |
 | TV-05 | Detalle: póster, título, año, duración, géneros, sinopsis y botón "Reproducir" / "Continuar desde mm:ss" (PRG-02), enfocado al abrir. |
-| TV-06 | Reproductor a pantalla completa con las mismas reglas que el teléfono: progreso (MOB-15) y token (MOB-16). Control: OK = pausa/reproduce, ←/→ = −/+10 s, Atrás = salir guardando. |
+| TV-06 | Reproductor a pantalla completa con las mismas reglas que el teléfono: progreso (MOB-15) y token (MOB-16). Control remoto: con los **controles ocultos**, OK los muestra (enfocando ⏯) y ←/→ adelantan/atrasan 10 s; con los **controles visibles**, las flechas se mueven entre los botones (⏪10, ⏯, ⏩10, **Calidad**) y OK activa el botón enfocado, nunca pausa por su cuenta. Las teclas ⏯/⏪/⏩ del control siempre actúan. Atrás oculta los controles y, si ya están ocultos, sale guardando. Los controles se ocultan solos tras 5 s sin tocar nada mientras reproduce, pero **no** mientras la lista de calidades está abierta. **Calidad** ofrece "Automática" y cada resolución disponible (igual que MOB-14). |
 | TV-07 | Se puede cerrar sesión desde la tele (vuelve a la pantalla del código). |
 | TV-08 | La app aparece en el inicio de Google TV (banner) y solo pide permiso de internet. |
 

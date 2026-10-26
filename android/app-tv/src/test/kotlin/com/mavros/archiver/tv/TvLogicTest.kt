@@ -162,13 +162,33 @@ class TvRowsTest {
 }
 
 class TvPlayerKeysTest {
-    @Test fun `TV-06 botones del control`() {
-        assertEquals(TvPlayerAction.TogglePlay, tvPlayerAction(KeyEvent.KEYCODE_DPAD_CENTER))
-        assertEquals(TvPlayerAction.TogglePlay, tvPlayerAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
-        assertEquals(TvPlayerAction.SeekBack, tvPlayerAction(KeyEvent.KEYCODE_DPAD_LEFT))
-        assertEquals(TvPlayerAction.SeekForward, tvPlayerAction(KeyEvent.KEYCODE_DPAD_RIGHT))
-        assertEquals(TvPlayerAction.Exit, tvPlayerAction(KeyEvent.KEYCODE_BACK))
-        assertNull(tvPlayerAction(KeyEvent.KEYCODE_DPAD_UP), "arriba/abajo quedan para los controles del reproductor")
+    private val hidden = false
+    private val visible = true
+
+    @Test fun `TV-06 controles ocultos - OK los muestra, flechas laterales adelantan o atrasan`() {
+        assertEquals(TvPlayerAction.ShowControls, tvPlayerAction(KeyEvent.KEYCODE_DPAD_CENTER, hidden))
+        assertEquals(TvPlayerAction.ShowControls, tvPlayerAction(KeyEvent.KEYCODE_ENTER, hidden))
+        assertEquals(TvPlayerAction.ShowControls, tvPlayerAction(KeyEvent.KEYCODE_DPAD_UP, hidden))
+        assertEquals(TvPlayerAction.SeekBack, tvPlayerAction(KeyEvent.KEYCODE_DPAD_LEFT, hidden))
+        assertEquals(TvPlayerAction.SeekForward, tvPlayerAction(KeyEvent.KEYCODE_DPAD_RIGHT, hidden))
+        assertEquals(TvPlayerAction.Exit, tvPlayerAction(KeyEvent.KEYCODE_BACK, hidden))
+    }
+
+    @Test fun `TV-06 controles visibles - flechas y OK van a los botones, nunca pausan solos`() {
+        for (key in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) {
+            assertEquals(TvPlayerAction.ToControls, tvPlayerAction(key, visible), "tecla $key")
+        }
+        assertEquals(TvPlayerAction.HideControls, tvPlayerAction(KeyEvent.KEYCODE_BACK, visible))
+    }
+
+    @Test fun `TV-06 teclas multimedia actuan siempre`() {
+        for (shown in listOf(hidden, visible)) {
+            assertEquals(TvPlayerAction.TogglePlay, tvPlayerAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, shown))
+            assertEquals(TvPlayerAction.SeekBack, tvPlayerAction(KeyEvent.KEYCODE_MEDIA_REWIND, shown))
+            assertEquals(TvPlayerAction.SeekForward, tvPlayerAction(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, shown))
+            assertEquals(TvPlayerAction.Exit, tvPlayerAction(KeyEvent.KEYCODE_MEDIA_STOP, shown))
+        }
+        assertNull(tvPlayerAction(KeyEvent.KEYCODE_VOLUME_UP, hidden), "el volumen lo maneja el sistema")
     }
 }
 
