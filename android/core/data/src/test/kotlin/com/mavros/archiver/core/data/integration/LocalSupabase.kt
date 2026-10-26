@@ -17,7 +17,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import io.github.jan.supabase.auth.user.UserSession
 import java.net.URI
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import java.util.UUID
 
 /**
@@ -127,4 +130,14 @@ object LocalSupabase {
 
     @Suppress("unused")
     private fun AdminUserUpdateBuilder.noop() = Unit
+
+    /**
+     * Token de acceso que el servidor rechaza (401) con el refresh token todavía válido: lo que tiene
+     * el teléfono una hora después. El servidor local firma con ES256, así que no se puede fabricar uno
+     * caducado con firma válida; para el cliente es lo mismo (firma alterada + expiresAt en el pasado).
+     */
+    fun UserSession.withRejectedAccessToken(): UserSession {
+        val (header, payload, signature) = accessToken.split(".")
+        return copy(accessToken = "$header.$payload.${signature.reversed()}", expiresAt = Clock.System.now() - 1.minutes)
+    }
 }

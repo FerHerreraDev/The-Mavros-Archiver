@@ -5,7 +5,9 @@ import com.mavros.archiver.core.data.SupabaseAuthRepository
 import com.mavros.archiver.core.data.SupabaseCatalogRepository
 import com.mavros.archiver.core.data.createMavrosSupabase
 import com.mavros.archiver.core.model.Catalog
+import com.mavros.archiver.core.data.integration.LocalSupabase.withRejectedAccessToken
 import io.github.jan.supabase.auth.MemorySessionManager
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,6 +64,23 @@ class CatalogRepositoryIT {
     }
 
     private fun Catalog.indexOf(id: String) = recent.indexOfFirst { it.id == id }
+
+    @Test fun `MOB-04 token caducado - catalogo y detalle llegan completos, sin error ni boveda vacia`() = runBlocking<Unit> {
+        val client = createMavrosSupabase(LocalSupabase.config, MemorySessionManager())
+        LocalSupabase.signIn(client, viewer)
+        client.auth.importSession(client.auth.currentSessionOrNull()!!.withRejectedAccessToken(), autoRefresh = false)
+        val repo = SupabaseCatalogRepository(client, SupabaseAuthRepository(client, CoroutineScope(SupervisorJob() + Dispatchers.Default)))
+
+        val catalog = repo.catalog()
+        assertIs<DataResult.Success<Catalog>>(catalog, "el usuario no debe ver un error por un token caducado")
+        assertTrue(catalog.value.indexOf(ids["new"]!!) >= 0, "nunca la bóveda vacía")
+
+        client.auth.importSession(client.auth.currentSessionOrNull()!!.withRejectedAccessToken(), autoRefresh = false)
+        val detail = repo.movie(ids["new"]!!)
+        assertIs<DataResult.Success<*>>(detail)
+        assertNotNull(detail.value)
+        assertNotNull(client.auth.currentSessionOrNull(), "la sesión sigue")
+    }
 
     @Test fun `MOB-07 solo publicadas, tambien para un admin`() = runBlocking<Unit> {
         for (user in listOf(viewer, boss)) {

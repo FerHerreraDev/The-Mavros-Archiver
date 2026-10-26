@@ -329,7 +329,7 @@ Proyecto Kotlin en `android/`. Habla con el mismo backend que la web (Supabase c
 | ID | Requisito |
 |---|---|
 | MOB-03 | Login con email y contraseña. Validación previa igual que la web (email válido, contraseña ≥ 8). Credenciales incorrectas, usuario desactivado o invitado sin contraseña → el mismo mensaje genérico, sin revelar si la cuenta existe. |
-| MOB-04 | La sesión se guarda en el almacenamiento privado de la app: al cerrar y abrir la app sigue dentro, sin volver a pedir contraseña. |
+| MOB-04 | La sesión se guarda en el almacenamiento privado de la app: al cerrar y abrir la app sigue dentro, sin volver a pedir contraseña. Esto vale **aunque el token de acceso ya haya caducado** (dura 1 h): la app lo renueva con el refresh token; un token caducado nunca cierra la sesión. |
 | MOB-05 | Cerrar sesión borra la sesión guardada y vuelve al login. |
 | MOB-06 | Si la sesión deja de ser válida (usuario desactivado, sesiones revocadas), la app vuelve al login sola. |
 

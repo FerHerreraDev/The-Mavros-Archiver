@@ -79,8 +79,18 @@ class SupabaseAuthRepository(
             client.auth.retrieveUserForCurrentSession(updateSession = true)
             true
         } catch (e: RestException) {
-            client.auth.clearSession()
-            false
+            // El token de acceso dura 1 h: rechazado no significa sesión inválida. Se renueva con el
+            // refresh token y solo si ESO falla (sesiones revocadas, usuario desactivado) se cierra (MOB-04, MOB-06)
+            try {
+                client.auth.refreshCurrentSession()
+                client.auth.retrieveUserForCurrentSession(updateSession = true)
+                true
+            } catch (e: Throwable) {
+                // Sin red se conserva; cualquier otro fallo (refresh rechazado, sesión ya borrada) la cierra
+                if (e.toDataError() == DataError.Network) return true
+                client.auth.clearSession()
+                false
+            }
         } catch (e: Throwable) {
             // Sin red no se cierra la sesión: se vuelve a validar más tarde
             true

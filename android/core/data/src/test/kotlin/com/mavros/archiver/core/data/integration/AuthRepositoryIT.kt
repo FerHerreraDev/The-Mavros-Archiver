@@ -4,20 +4,25 @@ import com.mavros.archiver.core.data.LoginError
 import com.mavros.archiver.core.data.SessionState
 import com.mavros.archiver.core.data.SupabaseAuthRepository
 import com.mavros.archiver.core.data.createMavrosSupabase
+import com.mavros.archiver.core.data.integration.LocalSupabase.withRejectedAccessToken
 import io.github.jan.supabase.auth.MemorySessionManager
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Clock
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -93,6 +98,40 @@ class AuthRepositoryIT {
         val state = second.awaitState { it !is SessionState.Loading }
         assertIs<SessionState.SignedIn>(state)
         assertEquals(user.id, state.userId)
+    }
+
+    @Test fun `MOB-04 token de acceso caducado - validar lo renueva, no cierra la sesion`() = runBlocking<Unit> {
+        val storage = MemorySessionManager()
+        val (repo, client) = repo(storage)
+        assertNull(repo.signIn(user.email, user.password))
+        repo.awaitState { it is SessionState.SignedIn }
+        val expired = client.auth.currentSessionOrNull()!!.withRejectedAccessToken()
+        client.auth.importSession(expired, autoRefresh = false)
+
+        assertTrue(repo.validateSession(), "un token caducado no es una sesión inválida")
+        val renewed = assertNotNull(client.auth.currentSessionOrNull(), "la sesión sigue")
+        assertNotEquals(expired.accessToken, renewed.accessToken, "se renovó el token")
+        assertEquals(user.id, renewed.user?.id)
+        assertNotNull(runCatching { storage.loadSession() }.getOrNull(), "sigue guardada")
+    }
+
+    @Test fun `MOB-04 abrir la app con el token caducado - sigue dentro sin pedir contrasena`() = runBlocking<Unit> {
+        val storage = MemorySessionManager()
+        val (first, firstClient) = repo(storage)
+        assertNull(first.signIn(user.email, user.password))
+        first.awaitState { it is SessionState.SignedIn }
+        storage.saveSession(firstClient.auth.currentSessionOrNull()!!.withRejectedAccessToken())
+
+        // "Reabrir la app" como MainActivity: cliente nuevo y validateSession() de inmediato
+        val (second, secondClient) = repo(storage)
+        assertTrue(second.validateSession() || secondClient.auth.currentSessionOrNull() == null)
+        val state = second.awaitState { it !is SessionState.Loading }
+        assertIs<SessionState.SignedIn>(state)
+        assertEquals(user.id, state.userId)
+        // Ya renovada y guardada
+        withTimeout(10_000) { while (secondClient.auth.currentSessionOrNull()?.expiresAt?.let { it < Clock.System.now() } != false) delay(100) }
+        assertTrue(second.validateSession())
+        assertNotNull(runCatching { storage.loadSession() }.getOrNull())
     }
 
     @Test fun `MOB-05 cerrar sesion borra la sesion guardada`() = runBlocking<Unit> {
