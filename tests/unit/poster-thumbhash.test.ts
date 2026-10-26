@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { thumbHashToApproximateAspectRatio, thumbHashToRGBA } from 'thumbhash'
-import { computePosterThumbhash, thumbhashFromImage } from '@/lib/poster/thumbhash'
+import { processPoster, optimizePoster, thumbhashFromImage, POSTER_MAX_WIDTH } from '@/lib/poster/thumbhash'
+import sharp from 'sharp'
+
+const thumbOf = async (...args: Parameters<typeof processPoster>) => (await processPoster(...args)).thumbhash
 import { thumbhashDataUrl } from '@/lib/poster/placeholder'
 import type { Lookup } from '@/lib/poster/fetch-poster'
 
@@ -38,33 +41,33 @@ describe('thumbhashFromImage (LOAD-03)', () => {
   })
 })
 
-describe('computePosterThumbhash (LOAD-03)', () => {
+describe('processPoster: vista previa (LOAD-03)', () => {
   it('sin póster → null y no descarga nada', async () => {
     const fetchImpl = vi.fn<typeof fetch>()
-    expect(await computePosterThumbhash(null, { fetchImpl, lookup })).toBeNull()
+    expect(await thumbOf(null, { fetchImpl, lookup })).toBeNull()
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('póster descargable → el mismo hash que la imagen', async () => {
     const png = fixture('red-blue-2x3.png')
     const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } }))
-    expect(await computePosterThumbhash('https://cdn.example.com/p.png', { fetchImpl, lookup })).toBe(await thumbhashFromImage(png))
+    expect(await thumbOf('https://cdn.example.com/p.png', { fetchImpl, lookup })).toBe(await thumbhashFromImage(png))
   })
 
   it('póster que no se puede descargar → null, sin lanzar', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => {
       throw new Error('ECONNRESET')
     })
-    await expect(computePosterThumbhash('https://cdn.example.com/p.png', { fetchImpl, lookup })).resolves.toBeNull()
+    await expect(thumbOf('https://cdn.example.com/p.png', { fetchImpl, lookup })).resolves.toBeNull()
   })
 
   it('póster en la red interna → null, sin lanzar', async () => {
-    await expect(computePosterThumbhash('https://127.0.0.1/p.png', { fetchImpl: vi.fn<typeof fetch>(), lookup })).resolves.toBeNull()
+    await expect(thumbOf('https://127.0.0.1/p.png', { fetchImpl: vi.fn<typeof fetch>(), lookup })).resolves.toBeNull()
   })
 
   it('"imagen" corrupta → null, sin lanzar', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => new Response('basura', { headers: { 'content-type': 'image/png' } }))
-    await expect(computePosterThumbhash('https://cdn.example.com/p.png', { fetchImpl, lookup })).resolves.toBeNull()
+    await expect(thumbOf('https://cdn.example.com/p.png', { fetchImpl, lookup })).resolves.toBeNull()
   })
 })
 
@@ -76,5 +79,37 @@ describe('thumbhashDataUrl (LOAD-02)', () => {
 
   it.each([null, undefined, '', '%%%', 'AA=='])('%s → null (se queda el color de tarjeta)', (hash) => {
     expect(thumbhashDataUrl(hash)).toBeNull()
+  })
+})
+
+describe('copia optimizada (LOAD-07)', () => {
+  it(`póster grande → WebP de ${POSTER_MAX_WIDTH} px de ancho, misma proporción`, async () => {
+    const big = await sharp({ create: { width: 1200, height: 1800, channels: 3, background: { r: 200, g: 20, b: 20 } } }).jpeg().toBuffer()
+    const out = await optimizePoster(big)
+    const meta = await sharp(out).metadata()
+    expect(meta.format).toBe('webp')
+    expect(meta.width).toBe(POSTER_MAX_WIDTH)
+    expect(meta.height).toBe(900)
+    expect(out.length).toBeLessThan(big.length)
+  })
+
+  it('póster chico no se agranda', async () => {
+    const meta = await sharp(await optimizePoster(fixture('red-blue-2x3.png'))).metadata()
+    expect(meta).toMatchObject({ format: 'webp', width: 200, height: 300 })
+  })
+
+  it('processPoster descarga una vez y da vista previa y copia', async () => {
+    const png = fixture('red-blue-2x3.png')
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } }))
+    const out = await processPoster('https://cdn.example.com/p.png', { fetchImpl, lookup })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(out.thumbhash).toBe(await thumbhashFromImage(png))
+    expect((await sharp(out.image!).metadata()).format).toBe('webp')
+  })
+
+  it('sin póster o si falla la descarga → ambos null', async () => {
+    expect(await processPoster(null)).toEqual({ thumbhash: null, image: null })
+    const fetchImpl = vi.fn<typeof fetch>(async () => { throw new Error('x') })
+    expect(await processPoster('https://cdn.example.com/p.png', { fetchImpl, lookup })).toEqual({ thumbhash: null, image: null })
   })
 })

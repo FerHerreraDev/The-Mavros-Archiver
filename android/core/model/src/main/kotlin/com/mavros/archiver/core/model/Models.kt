@@ -15,12 +15,17 @@ data class Movie(
     @SerialName("duration_seconds") val durationSeconds: Int,
     val genres: List<String> = emptyList(),
     @SerialName("poster_url") val posterUrl: String? = null,
+    /** Copia optimizada en el bucket `posters` (LOAD-07); si no hay, se usa [posterUrl] */
+    @SerialName("poster_image_url") val posterImageUrl: String? = null,
     /** Vista previa borrosa del póster en base64 (LOAD-02) */
     @SerialName("poster_thumbhash") val posterThumbhash: String? = null,
     @SerialName("hls_path") val hlsPath: String? = null,
     val status: String = "published",
     @SerialName("published_at") val publishedAt: String? = null,
-)
+) {
+    /** La imagen que se carga: la copia propia si existe */
+    val posterSrc: String? get() = posterImageUrl ?: posterUrl
+}
 
 data class ContinueItem(val movie: Movie, val positionSeconds: Double)
 

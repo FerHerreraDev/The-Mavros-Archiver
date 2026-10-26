@@ -208,6 +208,13 @@ class LoadingTest {
         compose.onNodeWithTag("poster-image-1", useUnmergedTree = true).assertExists()
     }
 
+    @Test fun `LOAD-07 usa la copia optimizada cuando existe (aunque la URL original ya no sirva)`() {
+        content { PosterCard(movie("1", "Akira").copy(posterUrl = FAIL, posterImageUrl = OK), onClick = {}, modifier = Modifier.width(120.dp)) }
+        compose.onNodeWithTag("poster-image-1", useUnmergedTree = true).assertIsDisplayed()
+        compose.waitForIdle()
+        compose.onNodeWithTag("poster-fallback-1", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @Test fun `LOAD-02 ThumbHash corrupto no rompe la tarjeta`() {
         card(PENDING, "%%%")
         compose.onNodeWithTag("poster-placeholder-1", useUnmergedTree = true).assertDoesNotExist()

@@ -18,7 +18,7 @@ export function MovieCard({ movie, positionSeconds }: Props) {
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-card transition-transform duration-300 group-hover:scale-[1.03] group-focus-visible:ring-2 group-focus-visible:ring-accent">
         <PosterImage
-          src={movie.poster_url}
+          src={movie.poster_image_url ?? movie.poster_url}
           thumbhash={movie.poster_thumbhash}
           title={movie.title}
           sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, 50vw"

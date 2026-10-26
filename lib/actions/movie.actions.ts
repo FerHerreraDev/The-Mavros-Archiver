@@ -7,7 +7,8 @@ import { requireAdmin } from '@/lib/auth/guards'
 import { movieFormSchema } from '@/lib/movies'
 import { probeHlsMaster } from '@/lib/hls/remote'
 import { signedVideoBase } from '@/lib/video/playback'
-import { computePosterThumbhash } from '@/lib/poster/thumbhash'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { processPoster, uploadPoster } from '@/lib/poster/thumbhash'
 
 const MOVIES_PATH = '/dashboard/admin/movies'
 const DENIED = 'Acceso denegado. Se requieren privilegios de administrador.'
@@ -25,7 +26,7 @@ const IdSchema = z.uuid()
  * Valida el formulario y verifica el video en R2 (MOV-07, MOV-08).
  * Devuelve los datos listos para guardar o el error a mostrar.
  */
-async function prepare(formData: FormData) {
+async function prepare(formData: FormData, supabase: SupabaseClient) {
   const raw = Object.fromEntries(FIELDS.map((f) => [f, String(formData.get(f) ?? '')]))
   const parsed = movieFormSchema.safeParse(raw)
   if (!parsed.success) {
@@ -42,16 +43,16 @@ async function prepare(formData: FormData) {
     return { result: { error: fieldErrors ? 'Revisa los campos marcados.' : message, fieldErrors } }
   }
 
-  // En paralelo: la vista previa del póster nunca bloquea ni hace fallar el guardado (LOAD-03)
-  const [probe, poster_thumbhash] = await Promise.all([
-    probeHlsMaster(base, parsed.data.hls_path),
-    computePosterThumbhash(parsed.data.poster_url),
-  ])
+  // En paralelo: el póster (vista previa + copia optimizada) nunca bloquea ni hace fallar el guardado
+  const [probe, poster] = await Promise.all([probeHlsMaster(base, parsed.data.hls_path), processPoster(parsed.data.poster_url)])
   if (!probe.ok) {
     return { result: { error: 'No se pudo verificar el video.', fieldErrors: { hls_path: [probe.error] } } }
   }
+  const poster_image_url = poster.image ? await uploadPoster(supabase, poster.image) : null
 
-  return { data: { ...parsed.data, duration_seconds: probe.durationSeconds, poster_thumbhash } }
+  return {
+    data: { ...parsed.data, duration_seconds: probe.durationSeconds, poster_thumbhash: poster.thumbhash, poster_image_url },
+  }
 }
 
 function dbError(error: { code?: string; message: string }): MovieActionResult {
@@ -66,7 +67,7 @@ export async function createMovieAction(formData: FormData): Promise<MovieAction
   const session = await requireAdmin()
   if (!session) return { error: DENIED }
 
-  const prepared = await prepare(formData)
+  const prepared = await prepare(formData, session.supabase)
   if (!prepared.data) return prepared.result
 
   // Cliente con la sesión del admin: RLS vuelve a exigir is_admin() y fija created_by
@@ -82,7 +83,7 @@ export async function updateMovieAction(id: string, formData: FormData): Promise
   if (!session) return { error: DENIED }
   if (!IdSchema.safeParse(id).success) return { error: 'Película no encontrada.' }
 
-  const prepared = await prepare(formData)
+  const prepared = await prepare(formData, session.supabase)
   if (!prepared.data) return prepared.result
 
   const { data, error } = await session.supabase.from('movies').update(prepared.data).eq('id', id).select('id')

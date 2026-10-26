@@ -45,12 +45,12 @@ fun thumbhashBitmap(hash: String?): ImageBitmap? {
 @Composable
 fun PosterImage(movie: Movie, modifier: Modifier = Modifier, fallback: @Composable () -> Unit) {
     val placeholder = remember(movie.posterThumbhash) { thumbhashBitmap(movie.posterThumbhash) }
-    var failed by remember(movie.posterUrl) { mutableStateOf(false) }
+    var failed by remember(movie.posterSrc) { mutableStateOf(false) }
     val reduceMotion = rememberReduceMotion()
     val context = LocalContext.current
 
     Box(modifier) {
-        if (movie.posterUrl == null || failed) {
+        if (movie.posterSrc == null || failed) {
             fallback()
             return@Box
         }
@@ -62,9 +62,9 @@ fun PosterImage(movie: Movie, modifier: Modifier = Modifier, fallback: @Composab
                 modifier = Modifier.fillMaxSize().testTag("poster-placeholder-${movie.id}"),
             )
         }
-        val request = remember(movie.posterUrl, reduceMotion) {
+        val request = remember(movie.posterSrc, reduceMotion) {
             ImageRequest.Builder(context)
-                .data(movie.posterUrl)
+                .data(movie.posterSrc)
                 .crossfade(if (reduceMotion) 0 else REVEAL_FADE_MS)
                 .build()
         }

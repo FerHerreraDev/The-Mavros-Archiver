@@ -76,8 +76,8 @@ function MovieRow({ movie }: { movie: Movie }) {
       <td className="px-6 py-3">
         <div className="flex items-center gap-3">
           <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-card">
-            {movie.poster_url ? (
-              <Image src={movie.poster_url} alt="" fill sizes="40px" unoptimized className="object-cover" />
+            {movie.poster_image_url ?? movie.poster_url ? (
+              <Image src={(movie.poster_image_url ?? movie.poster_url)!} alt="" fill sizes="40px" unoptimized className="object-cover" />
             ) : (
               <Film className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground" />
             )}

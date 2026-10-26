@@ -24,7 +24,10 @@ export async function login(page: Page, email: string, password: string) {
 export async function loginAs(page: Page, user: { email: string; password: string }) {
   await page.goto('/login')
   await login(page, user.email, user.password)
-  await expect(page).toHaveURL(/\/dashboard$/)
+  // 15 s y no los 5 por defecto: al arrancar la corrida (5 navegadores + Docker + emulador) se midieron
+  // pausas de ~5 s del servidor completo, incluso sirviendo archivos estáticos. Ninguna regla del
+  // SPEC fija el tiempo de login; esto es solo el margen de la infraestructura de pruebas.
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 })
 }
 
 /** Página en un navegador aparte (otra persona, sin cookies compartidas) */

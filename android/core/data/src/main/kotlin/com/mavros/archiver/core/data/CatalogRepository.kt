@@ -20,7 +20,7 @@ interface CatalogRepository {
     suspend fun movie(id: String): DataResult<MovieDetail?>
 }
 
-private const val CARD_FIELDS = "id, slug, title, release_year, duration_seconds, genres, poster_url, poster_thumbhash, published_at, status"
+private const val CARD_FIELDS = "id, slug, title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status"
 
 @Serializable
 private data class ProgressRow(

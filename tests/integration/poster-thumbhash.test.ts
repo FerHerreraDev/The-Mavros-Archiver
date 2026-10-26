@@ -56,7 +56,7 @@ const fields = (overrides: Record<string, string>) =>
     ...overrides,
   })
 const bySlug = async (slug: string) =>
-  (await adminClient().from('movies').select('id, poster_url, poster_thumbhash').eq('slug', slug).single()).data!
+  (await adminClient().from('movies').select('id, poster_url, poster_thumbhash, poster_image_url').eq('slug', slug).single()).data!
 
 async function create(overrides: Record<string, string>) {
   resetRequest({ ip: randomIp(), cookies: await sessionCookies(boss) })
@@ -72,10 +72,29 @@ describe('LOAD-03 ThumbHash al guardar', () => {
     expect((await bySlug(slug)).poster_thumbhash).toBe(await expected())
   })
 
+  it('LOAD-07 crear con póster → copia WebP en el bucket posters, pública y con el hash como nombre', async () => {
+    const { slug } = await create({ poster_url: 'https://posters.test/red-blue-2x3.png' })
+    const movie = await bySlug(slug)
+    expect(movie.poster_image_url).toMatch(/\/storage\/v1\/object\/public\/posters\/[0-9a-f]{32}\.webp$/)
+
+    const res = await fetch(movie.poster_image_url!)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/webp')
+    expect(res.headers.get('cache-control')).toContain('31536000')
+    const meta = await (await import('sharp')).default(Buffer.from(await res.arrayBuffer())).metadata()
+    expect(meta).toMatchObject({ format: 'webp', width: 200, height: 300 })
+  })
+
+  it('LOAD-07 el mismo póster en dos películas usa el mismo archivo', async () => {
+    const a = await bySlug((await create({ poster_url: 'https://posters.test/red-blue-2x3.png' })).slug)
+    const b = await bySlug((await create({ poster_url: 'https://posters.test/red-blue-2x3.png' })).slug)
+    expect(a.poster_image_url).toBe(b.poster_image_url)
+  })
+
   it('póster que no se puede leer → la película se guarda igual, sin vista previa', async () => {
     const { redirect, slug } = await create({ poster_url: 'https://caido.example.com/p.png' })
     expect(redirect).toBe('/dashboard/admin/movies')
-    expect(await bySlug(slug)).toMatchObject({ poster_url: 'https://caido.example.com/p.png', poster_thumbhash: null })
+    expect(await bySlug(slug)).toMatchObject({ poster_url: 'https://caido.example.com/p.png', poster_thumbhash: null, poster_image_url: null })
   })
 
   it('sin póster → sin vista previa', async () => {
@@ -94,7 +113,7 @@ describe('LOAD-03 ThumbHash al guardar', () => {
 
     resetRequest({ ip: randomIp(), cookies: await sessionCookies(boss) })
     await runAndCaptureRedirect(() => updateMovieAction(id, fields({ slug, poster_url: '' })))
-    expect(await bySlug(slug)).toMatchObject({ poster_url: null, poster_thumbhash: null })
+    expect(await bySlug(slug)).toMatchObject({ poster_url: null, poster_thumbhash: null, poster_image_url: null })
   })
 
   it('un formulario no puede inyectar su propio poster_thumbhash', async () => {

@@ -30,7 +30,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
       <MoviePlayer
         movieId={movie.id}
         title={movie.title}
-        poster={movie.poster_url}
+        poster={movie.poster_image_url ?? movie.poster_url}
         initialUrl={url}
         initialExpiresAt={expiresAt}
         startAt={resumePosition(positionSeconds, movie.duration_seconds)}

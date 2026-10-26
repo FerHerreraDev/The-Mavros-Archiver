@@ -14,9 +14,10 @@ describe('sharp no disponible (LOAD-03)', () => {
     await expect(import('@/lib/actions/movie.actions')).resolves.toHaveProperty('updateMovieAction')
   })
 
-  it('calcular la vista previa devuelve null, sin lanzar', async () => {
-    const { computePosterThumbhash } = await import('@/lib/poster/thumbhash')
+  it('calcular la vista previa y la copia devuelve null, sin lanzar', async () => {
+    const { processPoster } = await import('@/lib/poster/thumbhash')
+    const thumbOf = async (...args: Parameters<typeof processPoster>) => (await processPoster(...args)).thumbhash
     const fetchImpl = vi.fn<typeof fetch>(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } }))
-    await expect(computePosterThumbhash('https://cdn.example.com/p.png', { fetchImpl, lookup })).resolves.toBeNull()
+    await expect(thumbOf('https://cdn.example.com/p.png', { fetchImpl, lookup })).resolves.toBeNull()
   })
 })
