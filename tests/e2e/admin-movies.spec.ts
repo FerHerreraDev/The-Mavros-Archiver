@@ -146,3 +146,51 @@ test('MOV-14 Editar y Nueva película muestran al instante que están cargando',
   await expect(create.getByText('Cargando…')).toBeAttached({ timeout: 500 })
   await expect(page.getByRole('heading', { name: 'Nueva película' })).toBeVisible({ timeout: 10_000 })
 })
+
+/** Retrasa 1.5 s las Server Actions (POST) de esa página y cuenta cuántas se enviaron */
+async function slowActions(page: import('@playwright/test').Page, path: RegExp) {
+  const posts: string[] = []
+  await page.route(path, async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    posts.push(route.request().url())
+    await new Promise((r) => setTimeout(r, 1500))
+    await route.continue()
+  })
+  return posts
+}
+
+test('UX-01 botones de la tabla: bloqueados, con indicador, y un doble clic envía una sola vez', async ({ page }) => {
+  const title = `E2E Doble ${uniq()}`
+  await loginAs(page, admin)
+  await createMovie(page, title)
+  await expect(row(page, title)).toBeVisible()
+  const posts = await slowActions(page, /\/dashboard\/admin\/movies(\?|$)/)
+
+  const publish = row(page, title).getByRole('button', { name: `Publicar ${title}` })
+  await publish.click()
+  await expect(publish).toHaveAttribute('aria-busy', 'true')
+  await expect(publish.getByTestId('spinner')).toBeVisible()
+  await expect(row(page, title).getByRole('button', { name: `Borrar ${title}` })).toBeDisabled()
+  await publish.click({ force: true }) // segundo clic mientras sigue enviando
+  await expect(row(page, title).getByText('Publicada', { exact: true })).toBeVisible({ timeout: 10_000 })
+  expect(posts).toHaveLength(1)
+})
+
+test('UX-01 formulario de película: campos bloqueados mientras guarda y un doble clic guarda una vez', async ({ page }) => {
+  const title = `E2E Form ${uniq()}`
+  await loginAs(page, admin)
+  await page.goto('/dashboard/admin/movies/new')
+  const posts = await slowActions(page, /\/dashboard\/admin\/movies\/new(\?|$)/)
+  await page.getByLabel('Título', { exact: true }).fill(title)
+  await page.getByLabel('Video (ruta en R2)').fill('ladder/master.m3u8')
+
+  const save = page.getByRole('button', { name: /guardar borrador/i })
+  await save.click()
+  await expect(page.getByLabel('Título', { exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /verificando video/i })).toBeDisabled()
+  await expect(page.getByTestId('spinner')).toBeVisible()
+  await page.getByRole('button', { name: /verificando video/i }).click({ force: true })
+  await expect(page).toHaveURL(/\/dashboard\/admin\/movies$/, { timeout: 15_000 })
+  expect(posts).toHaveLength(1)
+  await expect(row(page, title)).toHaveCount(1)
+})

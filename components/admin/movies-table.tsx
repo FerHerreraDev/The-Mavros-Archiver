@@ -7,6 +7,7 @@ import { Pencil, Eye, EyeOff, Trash2, Film } from 'lucide-react'
 import { setMovieStatusAction, deleteMovieAction, type MovieActionResult } from '@/lib/actions/movie.actions'
 import { formatDuration, type Movie } from '@/lib/movies'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import { LinkPendingIcon } from '@/components/ui/link-pending'
 
 const ACTION_BUTTON =
@@ -49,10 +50,13 @@ export function MoviesTable({ movies }: { movies: Movie[] }) {
 
 function MovieRow({ movie }: { movie: Movie }) {
   const [isPending, startTransition] = useTransition()
+  // Qué botón se tocó: solo ese muestra el indicador; todos quedan bloqueados (UX-01)
+  const [running, setRunning] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<MovieActionResult | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  const run = (action: () => Promise<MovieActionResult>) => {
+  const run = (key: string, action: () => Promise<MovieActionResult>) => {
+    setRunning(key)
     startTransition(async () => {
       setFeedback(null)
       try {
@@ -65,6 +69,7 @@ function MovieRow({ movie }: { movie: Movie }) {
   }
 
   const published = movie.status === 'published'
+  const busy = (key: string) => (isPending && running === key) || undefined
 
   return (
     <tr className="align-middle">
@@ -110,9 +115,10 @@ function MovieRow({ movie }: { movie: Movie }) {
             className={ACTION_BUTTON}
             disabled={isPending}
             aria-label={published ? `Despublicar ${movie.title}` : `Publicar ${movie.title}`}
-            onClick={() => run(() => setMovieStatusAction({ id: movie.id, status: published ? 'draft' : 'published' }))}
+            aria-busy={busy('status')}
+            onClick={() => run('status', () => setMovieStatusAction({ id: movie.id, status: published ? 'draft' : 'published' }))}
           >
-            {published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {busy('status') ? <Spinner /> : published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {published ? 'Despublicar' : 'Publicar'}
           </button>
           {confirmingDelete ? (
@@ -122,9 +128,10 @@ function MovieRow({ movie }: { movie: Movie }) {
                 className={`${ACTION_BUTTON} border-destructive/50 text-destructive`}
                 disabled={isPending}
                 aria-label={`Confirmar borrar ${movie.title}`}
-                onClick={() => run(() => deleteMovieAction({ id: movie.id }))}
+                aria-busy={busy('delete')}
+                onClick={() => run('delete', () => deleteMovieAction({ id: movie.id }))}
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                {busy('delete') ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
                 ¿Seguro? Borrar
               </button>
               <button type="button" className={ACTION_BUTTON} disabled={isPending} onClick={() => setConfirmingDelete(false)}>

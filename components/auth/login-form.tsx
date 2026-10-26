@@ -9,6 +9,7 @@ import Link from 'next/link'
 
 // 1. Importamos tus componentes base de Shadcn
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -165,6 +166,7 @@ export function LoginForm({ initialError, redirectTo }: { initialError?: string;
             disabled={isButtonDisabled}
             className="w-full rounded-full font-semibold py-5" // py-5 para mantener la altura que tenías originalmente
           >
+            {isPending && <Spinner className="h-4 w-4" />}
             {isPending ? 'Authenticating...' : 'Sign In'}
           </Button>
         </fieldset>

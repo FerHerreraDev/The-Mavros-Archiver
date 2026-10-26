@@ -5,6 +5,7 @@ import { Mail, Send } from 'lucide-react'
 import { inviteUserAction } from '@/lib/actions/admin.actions'
 
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -82,7 +83,8 @@ export function InviteUserForm() {
           className="rounded-full font-semibold py-5 px-6"
         >
           <Send className="h-4 w-4" />
-          {isPending ? 'Enviando...' : 'Enviar invitación'}
+          {isPending && <Spinner className="h-4 w-4" />}
+            {isPending ? 'Enviando...' : 'Enviar invitación'}
         </Button>
       </form>
 

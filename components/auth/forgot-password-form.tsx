@@ -8,6 +8,7 @@ import { z } from 'zod'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -109,7 +110,8 @@ export function ForgotPasswordForm() {
               disabled={isPending || emailValue.trim() === ''}
               className="w-full rounded-full font-semibold py-5"
             >
-              {isPending ? 'Sending...' : 'Send reset link'}
+              {isPending && <Spinner className="h-4 w-4" />}
+            {isPending ? 'Sending...' : 'Send reset link'}
             </Button>
           </fieldset>
         </form>

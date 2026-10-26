@@ -7,6 +7,7 @@ import { resetPasswordSchema } from '@/lib/validations/auth.schema'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -153,6 +154,7 @@ export function SetPasswordForm({ email }: { email: string }) {
             disabled={isButtonDisabled}
             className="w-full rounded-full font-semibold py-5"
           >
+            {isPending && <Spinner className="h-4 w-4" />}
             {isPending ? 'Saving...' : 'Save and enter'}
           </Button>
         </fieldset>

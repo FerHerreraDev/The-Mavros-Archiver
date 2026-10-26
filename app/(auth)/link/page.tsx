@@ -5,7 +5,8 @@ import { getSessionUser } from '@/lib/auth/guards'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { decideDeviceAction, type LinkProblem } from '@/lib/actions/device.actions'
 import { formatUserCode, normalizeUserCode } from '@/lib/device-codes'
-import { Button } from '@/components/ui/button'
+import Form from 'next/form'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -98,12 +99,12 @@ export default async function LinkPage({
 
         <form action={decideDeviceAction} className="flex gap-3">
           <input type="hidden" name="code" value={userCode} />
-          <Button type="submit" name="decision" value="deny" variant="outline" className="flex-1 rounded-full py-5">
+          <SubmitButton name="decision" value="deny" variant="outline" className="flex-1 rounded-full py-5">
             Rechazar
-          </Button>
-          <Button type="submit" name="decision" value="approve" className="flex-1 rounded-full font-semibold py-5">
+          </SubmitButton>
+          <SubmitButton name="decision" value="approve" className="flex-1 rounded-full font-semibold py-5">
             Aprobar
-          </Button>
+          </SubmitButton>
         </form>
       </div>
     )
@@ -122,7 +123,8 @@ export default async function LinkPage({
         </div>
       )}
 
-      <form action="/link" method="get" className="space-y-4">
+      {/* next/form: navegación del lado del cliente (con barra de progreso, LOAD-06) en vez de recargar la página */}
+      <Form action="/link" className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="code" className={LABEL}>Código</Label>
           <Input
@@ -137,8 +139,8 @@ export default async function LinkPage({
             className="font-mono text-center text-lg tracking-[0.2em] uppercase bg-card rounded-full h-auto py-2"
           />
         </div>
-        <Button type="submit" className="w-full rounded-full font-semibold py-5">Continuar</Button>
-      </form>
+        <SubmitButton className="w-full rounded-full font-semibold py-5">Continuar</SubmitButton>
+      </Form>
     </div>
   )
 }

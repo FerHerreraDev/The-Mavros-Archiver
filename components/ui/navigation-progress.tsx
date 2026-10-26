@@ -27,8 +27,19 @@ export function NavigationProgress() {
       if (url.pathname === location.pathname && url.search === location.search) return
       setLeaving(location.pathname + location.search)
     }
+    // Formularios GET (p. ej. el código de la TV en /link): también son navegaciones
+    function onSubmit(event: SubmitEvent) {
+      const form = event.target as HTMLFormElement
+      if (form.method.toLowerCase() !== 'get' || typeof form.getAttribute('action') !== 'string') return
+      if (new URL(form.action, location.href).origin !== location.origin) return
+      setLeaving(location.pathname + location.search)
+    }
     window.addEventListener('click', onClick, true)
-    return () => window.removeEventListener('click', onClick, true)
+    window.addEventListener('submit', onSubmit)
+    return () => {
+      window.removeEventListener('click', onClick, true)
+      window.removeEventListener('submit', onSubmit)
+    }
   }, [])
 
   if (leaving === null || leaving !== current) return null

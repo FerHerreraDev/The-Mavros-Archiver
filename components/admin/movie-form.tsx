@@ -8,6 +8,7 @@ import type { Movie } from '@/lib/movies'
 
 import { Button } from '@/components/ui/button'
 import { LinkPendingIcon } from '@/components/ui/link-pending'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -136,7 +137,7 @@ export function MovieForm({ action, movie, submitLabel }: Props) {
           Cancelar
         </Link>
         <Button type="submit" disabled={isPending} className="rounded-full font-semibold py-5 px-6">
-          <Save className="h-4 w-4" />
+          {isPending ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {isPending ? 'Verificando video…' : submitLabel}
         </Button>
       </div>

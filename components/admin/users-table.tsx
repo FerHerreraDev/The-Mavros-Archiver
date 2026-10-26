@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { Spinner } from '@/components/ui/spinner'
 import { ShieldCheck, ShieldOff, MailPlus, Ban, RotateCcw } from 'lucide-react'
 import {
   updateUserRoleAction,
@@ -51,9 +52,12 @@ export function UsersTable({ users }: { users: AdminUserRow[] }) {
 
 function UserRow({ user }: { user: AdminUserRow }) {
   const [isPending, startTransition] = useTransition()
+  // Qué botón se tocó: solo ese muestra el indicador; todos quedan bloqueados (UX-01)
+  const [running, setRunning] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<AdminActionResult | null>(null)
 
-  const run = (action: () => Promise<AdminActionResult>) => {
+  const run = (key: string, action: () => Promise<AdminActionResult>) => {
+    setRunning(key)
     startTransition(async () => {
       setFeedback(null)
       try {
@@ -66,6 +70,7 @@ function UserRow({ user }: { user: AdminUserRow }) {
   }
 
   const nextRole = user.role === 'admin' ? 'user' : 'admin'
+  const busy = (key: string) => (isPending && running === key) || undefined
 
   return (
     <tr className="align-middle">
@@ -92,9 +97,10 @@ function UserRow({ user }: { user: AdminUserRow }) {
               className={ACTION_BUTTON}
               disabled={isPending}
               aria-label={nextRole === 'admin' ? `Hacer admin a ${user.email}` : `Quitar admin a ${user.email}`}
-              onClick={() => run(() => updateUserRoleAction({ userId: user.id, role: nextRole }))}
+              aria-busy={busy('role')}
+              onClick={() => run('role', () => updateUserRoleAction({ userId: user.id, role: nextRole }))}
             >
-              {nextRole === 'admin' ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
+              {busy('role') ? <Spinner /> : nextRole === 'admin' ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
               {nextRole === 'admin' ? 'Hacer admin' : 'Quitar admin'}
             </button>
 
@@ -104,9 +110,10 @@ function UserRow({ user }: { user: AdminUserRow }) {
                 className={ACTION_BUTTON}
                 disabled={isPending}
                 aria-label={`Reenviar invitación a ${user.email}`}
-                onClick={() => run(() => resendInviteAction({ userId: user.id }))}
+                aria-busy={busy('resend')}
+                onClick={() => run('resend', () => resendInviteAction({ userId: user.id }))}
               >
-                <MailPlus className="h-3.5 w-3.5" />
+                {busy('resend') ? <Spinner /> : <MailPlus className="h-3.5 w-3.5" />}
                 Reenviar
               </button>
             )}
@@ -117,9 +124,10 @@ function UserRow({ user }: { user: AdminUserRow }) {
                 className={ACTION_BUTTON}
                 disabled={isPending}
                 aria-label={`Reactivar a ${user.email}`}
-                onClick={() => run(() => setUserActiveAction({ userId: user.id, active: true }))}
+                aria-busy={busy('active')}
+                onClick={() => run('active', () => setUserActiveAction({ userId: user.id, active: true }))}
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                {busy('active') ? <Spinner /> : <RotateCcw className="h-3.5 w-3.5" />}
                 Reactivar
               </button>
             ) : (
@@ -128,9 +136,10 @@ function UserRow({ user }: { user: AdminUserRow }) {
                 className={`${ACTION_BUTTON} hover:border-destructive/50 hover:text-destructive`}
                 disabled={isPending}
                 aria-label={`Desactivar a ${user.email}`}
-                onClick={() => run(() => setUserActiveAction({ userId: user.id, active: false }))}
+                aria-busy={busy('active')}
+                onClick={() => run('active', () => setUserActiveAction({ userId: user.id, active: false }))}
               >
-                <Ban className="h-3.5 w-3.5" />
+                {busy('active') ? <Spinner /> : <Ban className="h-3.5 w-3.5" />}
                 Desactivar
               </button>
             )}
