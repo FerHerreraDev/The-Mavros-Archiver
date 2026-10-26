@@ -191,7 +191,7 @@ Pensado para varios clientes (web y la futura app Android en Kotlin): las reglas
 | MOV-11 | Un admin puede editar, publicar, despublicar y borrar. Borrar pide confirmación y no toca los archivos en R2. |
 | MOV-12 | Un `user` que entra a `/dashboard/admin/movies` vuelve a `/dashboard`; todas las acciones de películas rechazan a anónimos y `user` sin cambiar nada. |
 | MOV-13 | El panel admin tiene pestañas **Usuarios** / **Películas**. |
-| MOV-14 | Al tocar **Editar** o **Nueva película**, el botón muestra **de inmediato** que está cargando (indicador girando, anunciado como "Cargando…") hasta que abre el formulario, aunque el servidor tarde. |
+| MOV-14 | Al tocar **Editar**, **Nueva película** o **Cancelar** del formulario, el botón muestra **de inmediato** que está cargando (indicador girando, anunciado como "Cargando…") hasta que abre el formulario, aunque el servidor tarde. |
 
 ## Fase 4 — Acceso protegido al video
 
@@ -354,3 +354,4 @@ Proyecto Kotlin en `android/`. Habla con el mismo backend que la web (Supabase c
 | LOAD-03 | El ThumbHash se calcula en el servidor al guardar una película con póster y se guarda junto a ella. Si el póster no se puede leer **o el procesador de imágenes no carga en el servidor**, la película se guarda igual (sin vista previa) y las páginas de crear/editar abren normal. |
 | LOAD-04 | El decodificador de ThumbHash de Android produce los mismos colores que el decodificador de referencia de la web (casos compartidos). |
 | LOAD-05 | Para calcularlo, el servidor solo descarga pósters por **https**, de hasta 15 MB, con tipo `image/*`, en menos de 10 s y nunca de direcciones locales o de red privada (evita que el servidor sea usado para leer la red interna). |
+| LOAD-06 | Toda navegación dentro de la app (enlaces del menú, pestañas, géneros, Cancelar…) muestra **al instante** una barra de progreso fina arriba, hasta que la página nueva aparece. Un enlace a la página en la que ya estás no la activa. Con "reducir movimiento" la barra se ve pero no se anima. |

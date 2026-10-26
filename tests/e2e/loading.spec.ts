@@ -182,3 +182,44 @@ test('LOAD-02 con "reducir movimiento" el póster aparece sin desvanecido', asyn
   const firstOpacity = page.evaluate(() => (window as unknown as { firstOpacity: Promise<string> }).firstOpacity)
   expect(await firstOpacity).toBe('1')
 })
+
+// ---------------------------------------------------------------- LOAD-06
+const bar = (page: Page) => page.getByRole('progressbar', { name: 'Cargando página' })
+/** El servidor tarda 2 s en responder esa ruta (también la navegación interna, ?_rsc=) */
+const slowRoute = (page: Page, path: string) =>
+  page.route(new RegExp(`${path.replace(/\//g, '\\/')}(\\?|$)`), async (route) => {
+    await new Promise((r) => setTimeout(r, 2000))
+    await route.continue()
+  })
+
+test('LOAD-06 al navegar aparece al instante la barra de progreso y se quita al llegar', async ({ page }) => {
+  await loginAs(page, viewer)
+  await slowRoute(page, '/dashboard/profile')
+  await expect(bar(page)).toHaveCount(0)
+
+  await page.getByRole('link', { name: 'Perfil' }).click()
+  await expect(bar(page)).toBeVisible({ timeout: 300 })
+  await expect(page).toHaveURL(/\/dashboard\/profile$/, { timeout: 10_000 })
+  await expect(bar(page)).toHaveCount(0)
+})
+
+test('LOAD-06 un enlace a la página actual no activa la barra', async ({ page }) => {
+  await loginAs(page, viewer)
+  await page.getByRole('link', { name: 'Catálogo' }).click()
+  for (let i = 0; i < 10; i++) {
+    expect(await bar(page).count()).toBe(0)
+    await page.waitForTimeout(100)
+  }
+})
+
+test('LOAD-06 con "reducir movimiento" la barra se ve pero no se anima', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await loginAs(page, viewer)
+  await slowRoute(page, '/dashboard/profile')
+  await page.getByRole('link', { name: 'Perfil' }).click()
+  await expect(bar(page)).toBeVisible({ timeout: 300 })
+  const animations = await bar(page).evaluate((el) =>
+    [el, ...el.querySelectorAll('*')].map((n) => getComputedStyle(n).animationName).filter((a) => a !== 'none')
+  )
+  expect(animations).toEqual([])
+})

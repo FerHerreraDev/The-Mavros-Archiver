@@ -7,6 +7,7 @@ import type { MovieActionResult } from '@/lib/actions/movie.actions'
 import type { Movie } from '@/lib/movies'
 
 import { Button } from '@/components/ui/button'
+import { LinkPendingIcon } from '@/components/ui/link-pending'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -130,7 +131,8 @@ export function MovieForm({ action, movie, submitLabel }: Props) {
       </fieldset>
 
       <div className="flex items-center justify-end gap-3">
-        <Link href="/dashboard/admin/movies" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/dashboard/admin/movies" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <LinkPendingIcon>{null}</LinkPendingIcon>
           Cancelar
         </Link>
         <Button type="submit" disabled={isPending} className="rounded-full font-semibold py-5 px-6">

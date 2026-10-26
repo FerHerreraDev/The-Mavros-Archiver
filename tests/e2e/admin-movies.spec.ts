@@ -130,7 +130,17 @@ test('MOV-14 Editar y Nueva película muestran al instante que están cargando',
   await expect(edit.getByText('Cargando…')).toBeAttached({ timeout: 500 })
   await expect(page.getByLabel('Título', { exact: true })).toHaveValue(title, { timeout: 10_000 })
 
-  await page.goto('/dashboard/admin/movies')
+  // Cancelar (de vuelta a la lista, también lenta)
+  await page.route(/\/dashboard\/admin\/movies(\?|$)/, async (route) => {
+    await new Promise((r) => setTimeout(r, 2000))
+    await route.continue()
+  })
+  const cancel = page.getByRole('link', { name: 'Cancelar' })
+  await cancel.click()
+  await expect(cancel.getByText('Cargando…')).toBeAttached({ timeout: 500 })
+  await expect(page).toHaveURL(/\/dashboard\/admin\/movies$/, { timeout: 10_000 })
+  await page.unroute(/\/dashboard\/admin\/movies(\?|$)/)
+
   const create = page.getByRole('link', { name: /nueva película/i })
   await create.click()
   await expect(create.getByText('Cargando…')).toBeAttached({ timeout: 500 })

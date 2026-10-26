@@ -87,3 +87,26 @@ body {
     animation-duration: 0s;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   Barra de navegación (LOAD-06): avanza rápido al principio y se frena cerca del final,
+   como la de YouTube; nunca llega al 100 % por sí sola (desaparece cuando carga la página)
+   -------------------------------------------------------------------------- */
+.nav-progress {
+  width: 0;
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes nav-progress {
+  0% { width: 0; }
+  10% { width: 35%; }
+  100% { width: 92%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress {
+    animation: none;
+    width: 100%;
+    opacity: 0.8;
+  }
+}

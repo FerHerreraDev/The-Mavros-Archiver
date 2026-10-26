@@ -1,6 +1,8 @@
 import { getSessionUser } from '@/lib/auth/guards'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
+import { NavigationProgress } from '@/components/ui/navigation-progress'
 import { Film, User, Shield, LogOut } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth.actions' // Asumiendo que así se llama tu acción de logout
 
@@ -20,6 +22,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* useSearchParams pide un límite de Suspense */}
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
       {/* Navbar Superior estilo Netflix */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
