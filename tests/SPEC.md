@@ -252,6 +252,7 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | ID | Requisito |
 |---|---|
 | PRG-01 | Mientras se ve, el progreso se guarda (cada ~10 s, al pausar y al salir). Lo escribe el propio cliente con su sesión (igual que hará Android). |
+| PRG-06 | Salir de la película (navegar a otra página, cerrar la pestaña) mientras se reproduce **nunca** borra el progreso ni lo regresa a 0, y guarda la posición en la que se salió (±1 s), también al **cerrar la pestaña**. |
 | PRG-02 | Al volver a abrir la película, arranca donde se quedó. Si estaba casi terminada (≥ 95 %) o recién empezada (< 10 s), arranca desde el principio. |
 | PRG-03 | RLS: cada usuario solo lee y escribe **su** progreso; no puede leer ni escribir el de otro ni a nombre de otro. Anónimos nada. |
 | PRG-04 | Solo se puede guardar progreso de películas que el usuario puede ver (no de borradores ajenos); la posición está entre 0 y la duración de la película. |
@@ -341,3 +342,14 @@ Proyecto Kotlin en `android/`. Habla con el mismo backend que la web (Supabase c
 | MOB-09 | Sin conexión o con error del servidor, cada pantalla muestra un error claro con "Reintentar" (nunca se queda cargando para siempre ni se cierra la app). |
 | MOB-11 | Todo texto de la app se lee contra el fondo (mismo criterio que UI-02: contraste WCAG AA). |
 | MOB-10 | Las reglas de progreso (`resumePosition`, `isInProgress`) dan exactamente los mismos resultados que las de la web. |
+
+## Estados de carga (web y Android)
+
+| ID | Requisito |
+|---|---|
+| MOB-12 | Al abrir la app Android con sesión guardada, antes del catálogo solo puede verse el estado de carga: nunca "bóveda vacía" ni un error. |
+| LOAD-01 | Mientras carga el catálogo se ve un **skeleton con la forma real** (títulos, chips y pósters 2:3) con un brillo que lo recorre (shimmer, ciclo de ~1.6 s). Si los datos llegan en menos de 200 ms el skeleton no llega a verse (sin parpadeo). Con "reducir movimiento" activado el skeleton no se anima. |
+| LOAD-02 | Cada póster muestra **al instante** una vista previa borrosa con sus colores reales (ThumbHash) y se funde con la imagen real al cargar (~300 ms). Sin ThumbHash: el color de tarjeta. Si la imagen falla: la tarjeta con el título. Con "reducir movimiento" la imagen aparece sin desvanecido. |
+| LOAD-03 | El ThumbHash se calcula en el servidor al guardar una película con póster y se guarda junto a ella. Si el póster no se puede leer, la película se guarda igual (sin vista previa). |
+| LOAD-04 | El decodificador de ThumbHash de Android produce los mismos colores que el decodificador de referencia de la web (casos compartidos). |
+| LOAD-05 | Para calcularlo, el servidor solo descarga pósters por **https**, de hasta 15 MB, con tipo `image/*`, en menos de 10 s y nunca de direcciones locales o de red privada (evita que el servidor sea usado para leer la red interna). |

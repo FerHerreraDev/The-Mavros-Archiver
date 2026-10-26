@@ -7,6 +7,7 @@ import { requireAdmin } from '@/lib/auth/guards'
 import { movieFormSchema } from '@/lib/movies'
 import { probeHlsMaster } from '@/lib/hls/remote'
 import { signedVideoBase } from '@/lib/video/playback'
+import { computePosterThumbhash } from '@/lib/poster/thumbhash'
 
 const MOVIES_PATH = '/dashboard/admin/movies'
 const DENIED = 'Acceso denegado. Se requieren privilegios de administrador.'
@@ -41,12 +42,16 @@ async function prepare(formData: FormData) {
     return { result: { error: fieldErrors ? 'Revisa los campos marcados.' : message, fieldErrors } }
   }
 
-  const probe = await probeHlsMaster(base, parsed.data.hls_path)
+  // En paralelo: la vista previa del póster nunca bloquea ni hace fallar el guardado (LOAD-03)
+  const [probe, poster_thumbhash] = await Promise.all([
+    probeHlsMaster(base, parsed.data.hls_path),
+    computePosterThumbhash(parsed.data.poster_url),
+  ])
   if (!probe.ok) {
     return { result: { error: 'No se pudo verificar el video.', fieldErrors: { hls_path: [probe.error] } } }
   }
 
-  return { data: { ...parsed.data, duration_seconds: probe.durationSeconds } }
+  return { data: { ...parsed.data, duration_seconds: probe.durationSeconds, poster_thumbhash } }
 }
 
 function dbError(error: { code?: string; message: string }): MovieActionResult {

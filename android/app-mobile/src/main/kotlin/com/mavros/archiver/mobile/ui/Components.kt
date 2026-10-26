@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -37,14 +35,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.design.MonoLabel
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.formatDurationShort
 
-/** Póster 2:3 con placeholder si no hay imagen y barra de progreso opcional (MOB-07) */
+/** Póster 2:3 con vista previa ThumbHash (LOAD-02), placeholder si no hay imagen y barra de progreso opcional (MOB-07) */
 @Composable
 fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier, progress: Float? = null) {
     // Sin clip en la tarjeta completa: la esquina redondeada mordía el texto de abajo (solo se redondea el póster)
@@ -62,10 +59,8 @@ fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier,
                 .background(MavrosColors.Card)
                 .border(1.dp, MavrosColors.Border, RoundedCornerShape(12.dp)),
         ) {
-            if (movie.posterUrl != null) {
-                AsyncImage(model = movie.posterUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            PosterImage(movie, Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().padding(12.dp).testTag("poster-fallback-${movie.id}"), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Outlined.Movie, contentDescription = null, tint = MavrosColors.MutedForeground)
                     Spacer(Modifier.height(8.dp))
                     Text(movie.title, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -96,13 +91,6 @@ fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.testTag("meta-${movie.id}"),
         )
-    }
-}
-
-@Composable
-fun LoadingState(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize().testTag("loading"), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MavrosColors.Accent)
     }
 }
 

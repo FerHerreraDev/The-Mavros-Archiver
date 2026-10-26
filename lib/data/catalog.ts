@@ -5,11 +5,11 @@ import type { Movie } from '@/lib/movies'
 
 export type CatalogMovie = Pick<
   Movie,
-  'id' | 'slug' | 'title' | 'release_year' | 'duration_seconds' | 'genres' | 'poster_url' | 'published_at'
+  'id' | 'slug' | 'title' | 'release_year' | 'duration_seconds' | 'genres' | 'poster_url' | 'poster_thumbhash' | 'published_at'
 >
 export type ContinueItem = { movie: CatalogMovie; positionSeconds: number; updatedAt: string }
 
-const CARD_FIELDS = 'id, slug, title, release_year, duration_seconds, genres, poster_url, published_at'
+const CARD_FIELDS = 'id, slug, title, release_year, duration_seconds, genres, poster_url, poster_thumbhash, published_at'
 
 /**
  * Catálogo del usuario con sesión. Todo pasa por RLS como ese usuario.

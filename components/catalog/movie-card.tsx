@@ -1,9 +1,8 @@
 import Link from 'next/link'
-import Image from 'next/image'
-import { Film } from 'lucide-react'
 import { formatDuration } from '@/lib/movies'
 import { progressRatio } from '@/lib/progress'
 import type { CatalogMovie } from '@/lib/data/catalog'
+import { PosterImage } from './poster-image'
 
 type Props = { movie: CatalogMovie; positionSeconds?: number }
 
@@ -18,21 +17,12 @@ export function MovieCard({ movie, positionSeconds }: Props) {
       aria-label={`Ver ${movie.title}`}
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-card transition-transform duration-300 group-hover:scale-[1.03] group-focus-visible:ring-2 group-focus-visible:ring-accent">
-        {movie.poster_url ? (
-          <Image
-            src={movie.poster_url}
-            alt=""
-            fill
-            unoptimized
-            sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, 50vw"
-            className="object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center bg-gradient-to-b from-card to-background">
-            <Film className="h-8 w-8 text-muted-foreground" />
-            <span className="text-sm font-semibold leading-tight text-foreground">{movie.title}</span>
-          </div>
-        )}
+        <PosterImage
+          src={movie.poster_url}
+          thumbhash={movie.poster_thumbhash}
+          title={movie.title}
+          sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, 50vw"
+        />
         {ratio !== null && (
           <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60" role="progressbar" aria-label="Progreso" aria-valuenow={Math.round(ratio * 100)} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-full bg-accent" style={{ width: `${ratio * 100}%` }} />

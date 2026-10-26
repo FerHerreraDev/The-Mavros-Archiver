@@ -47,7 +47,7 @@ import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.model.Catalog
 import com.mavros.archiver.core.model.ProgressRules
 import com.mavros.archiver.mobile.ui.ErrorState
-import com.mavros.archiver.mobile.ui.LoadingState
+import com.mavros.archiver.mobile.ui.CatalogSkeleton
 import com.mavros.archiver.mobile.ui.PosterCard
 
 @Composable
@@ -91,7 +91,8 @@ fun CatalogContent(
         },
     ) { padding ->
         when (state) {
-            CatalogUiState.Loading -> LoadingState(Modifier.padding(padding))
+            // Mismo padding que CatalogGrid: lo aplica la cuadrícula, no el contenedor
+            CatalogUiState.Loading -> CatalogSkeleton(padding)
             is CatalogUiState.Error -> ErrorState(state.error, onRetry, Modifier.padding(padding))
             is CatalogUiState.Content -> CatalogGrid(state.catalog, state.genre, padding, onOpenMovie, onSelectGenre)
         }

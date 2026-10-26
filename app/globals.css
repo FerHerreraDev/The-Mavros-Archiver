@@ -43,3 +43,47 @@ body {
   background: #333;
   border-radius: 4px;
 }
+/* -----------------------------------------------------------------------------
+   Skeleton (LOAD-01)
+   - Shimmer: un brillo diagonal que recorre la pantalla cada 1.6 s. background-attachment:
+     fixed hace que TODOS los bloques compartan el mismo brillo (una sola ola, no una por bloque).
+   - .skeleton-delayed: invisible los primeros 200 ms; si los datos llegan antes, no parpadea.
+   - Reducir movimiento: sin brillo (bloques fijos) y aparece sin desvanecido.
+   -------------------------------------------------------------------------- */
+.skeleton {
+  background-color: var(--color-card);
+  background-image: linear-gradient(
+    100deg,
+    transparent 40%,
+    oklch(1 0 0 / 0.07) 50%,
+    transparent 60%
+  );
+  background-size: 200vw 100%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: -120vw 0; }
+  to { background-position: 20vw 0; }
+}
+
+.skeleton-delayed {
+  opacity: 0;
+  animation: skeleton-reveal 300ms ease-out 200ms forwards;
+}
+
+@keyframes skeleton-reveal {
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+  .skeleton-delayed {
+    animation-duration: 0s;
+  }
+}

@@ -12,6 +12,8 @@ export type Movie = {
   duration_seconds: number
   genres: string[]
   poster_url: string | null
+  /** Vista previa borrosa del póster en base64 (LOAD-02) */
+  poster_thumbhash: string | null
   hls_path: string
   status: MovieStatus
   created_by: string | null

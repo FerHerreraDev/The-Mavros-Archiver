@@ -34,12 +34,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.design.MonoLabel
 import com.mavros.archiver.core.model.MovieDetail
@@ -47,7 +45,8 @@ import com.mavros.archiver.core.model.ProgressRules
 import com.mavros.archiver.core.model.formatDuration
 import com.mavros.archiver.core.model.formatTimestamp
 import com.mavros.archiver.mobile.ui.ErrorState
-import com.mavros.archiver.mobile.ui.LoadingState
+import com.mavros.archiver.mobile.ui.DetailSkeleton
+import com.mavros.archiver.mobile.ui.PosterImage
 
 @Composable
 fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (startAt: Double) -> Unit) {
@@ -75,7 +74,7 @@ fun DetailContent(state: DetailUiState, onBack: () -> Unit, onPlay: (Double) -> 
         },
     ) { padding ->
         when (state) {
-            DetailUiState.Loading -> LoadingState(Modifier.padding(padding))
+            DetailUiState.Loading -> DetailSkeleton(Modifier.padding(padding))
             is DetailUiState.Error -> ErrorState(state.error, onRetry, Modifier.padding(padding))
             DetailUiState.NotAvailable -> Box(Modifier.fillMaxSize().padding(padding).testTag("not-available"), contentAlignment = Alignment.Center) {
                 Text("Esta película no está disponible.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -96,10 +95,12 @@ private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Do
             Box(
                 Modifier.width(140.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp))
                     .background(MavrosColors.Card).border(1.dp, MavrosColors.Border, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center,
             ) {
-                if (movie.posterUrl != null) AsyncImage(movie.posterUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else Icon(Icons.Outlined.Movie, contentDescription = null, tint = MavrosColors.MutedForeground)
+                PosterImage(movie, Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.Movie, contentDescription = null, tint = MavrosColors.MutedForeground)
+                    }
+                }
             }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(movie.title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.testTag("title"))
