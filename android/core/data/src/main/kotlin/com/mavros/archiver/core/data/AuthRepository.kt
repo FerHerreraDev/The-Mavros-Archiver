@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.exceptions.RestException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +64,8 @@ class SupabaseAuthRepository(
         null
     } catch (e: RestException) {
         LoginError.InvalidCredentials
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Throwable) {
         if (e.toDataError() == DataError.Network) LoginError.Network else LoginError.InvalidCredentials
     }
@@ -85,12 +88,16 @@ class SupabaseAuthRepository(
                 client.auth.refreshCurrentSession()
                 client.auth.retrieveUserForCurrentSession(updateSession = true)
                 true
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 // Sin red se conserva; cualquier otro fallo (refresh rechazado, sesión ya borrada) la cierra
                 if (e.toDataError() == DataError.Network) return true
                 client.auth.clearSession()
                 false
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             // Sin red no se cierra la sesión: se vuelve a validar más tarde
             true

@@ -10,6 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed interface CatalogUiState {
@@ -40,7 +41,10 @@ class CatalogViewModel(private val repository: CatalogRepository) : ViewModel() 
         job?.cancel()
         if (showLoading && _state.value !is CatalogUiState.Content) _state.value = CatalogUiState.Loading
         job = viewModelScope.launch {
-            when (val result = repository.catalog(genre)) {
+            val result = repository.catalog(genre)
+            // Una carga reemplazada por otra no toca la pantalla (MOB-12)
+            if (!isActive) return@launch
+            when (result) {
                 is DataResult.Success -> _state.value = CatalogUiState.Content(result.value, genre)
                 is DataResult.Failure -> _state.update { current ->
                     // Con contenido ya mostrado, un refresco fallido no lo borra

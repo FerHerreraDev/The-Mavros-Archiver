@@ -12,7 +12,13 @@ import com.mavros.archiver.mobile.detail.playLabel
 import com.mavros.archiver.mobile.login.INVALID_CREDENTIALS_MESSAGE
 import com.mavros.archiver.mobile.login.LoginViewModel
 import com.mavros.archiver.mobile.login.NETWORK_MESSAGE
+import com.mavros.archiver.core.data.CatalogRepository
+import com.mavros.archiver.core.model.Catalog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -109,6 +115,33 @@ class ViewModelsTest {
         assertEquals(DataError.Network, assertIs<CatalogUiState.Error>(vm.state.value).error)
         repo.catalogResult = ok
         vm.retry()
+        assertIs<CatalogUiState.Content>(vm.state.value)
+    }
+
+    @Test fun `MOB-12 al abrir, el refresco que cancela la primera carga nunca muestra error`() {
+        // Un repositorio que, al ser cancelado, devuelve un error (como si se tragara la cancelación)
+        val repo = object : CatalogRepository {
+            var calls = 0
+            override suspend fun catalog(genre: String?): DataResult<Catalog> {
+                calls++
+                if (calls == 1) {
+                    try {
+                        awaitCancellation()
+                    } catch (e: CancellationException) {
+                        return DataResult.Failure(DataError.Server)
+                    }
+                }
+                return FakeCatalogRepository().catalogResult
+            }
+            override suspend fun movie(id: String): DataResult<MovieDetail?> = DataResult.Success(null)
+        }
+        val vm = CatalogViewModel(repo)
+        val seen = mutableListOf<CatalogUiState>()
+        val collector = CoroutineScope(Dispatchers.Unconfined).launch { vm.state.collect { seen += it } }
+
+        vm.refresh() // LifecycleResumeEffect al mostrarse la pantalla
+        collector.cancel()
+        assertTrue(seen.none { it is CatalogUiState.Error }, "estados vistos: $seen")
         assertIs<CatalogUiState.Content>(vm.state.value)
     }
 

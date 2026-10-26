@@ -9,6 +9,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
@@ -79,6 +80,9 @@ class SupabaseCatalogRepository(
 
     private suspend fun <T> guarded(block: suspend () -> T): DataResult<T> = try {
         DataResult.Success(block())
+    } catch (e: CancellationException) {
+        // Cancelar no es un error: la pantalla pidió otra carga (MOB-12)
+        throw e
     } catch (e: Throwable) {
         val error = e.toDataError()
         if (error == DataError.Unauthorized) auth.onUnauthorized()
