@@ -165,6 +165,7 @@ Aplica a cada película que se sube a R2. Se verifica con `pnpm hls:verify` (loc
 | VID-05 | La duración total de cada calidad coincide con la del archivo original (±1 s). |
 | VID-06 | La calidad más alta conserva la resolución original, y ninguna calidad tiene más resolución que el original. |
 | VID-07 | En R2, cada playlist y cada segmento responde 200 con su tipo correcto (`application/vnd.apple.mpegurl` / `video/mp2t`) y permite CORS. |
+| VID-08 | Calidad por resolución (H.264, CRF con tope de bitrate y búfer de 2× el tope). Topes: **2160p 16 Mbps, 1440p 9, 1080p 6, 720p 3, 480p 1.4, 360p 0.8**. Cada calidad usa el tope de **su** resolución (un original 4K no queda limitado al tope de 1080p). Debajo del original se generan 1080p, 720p, 480p y 360p (solo las menores que el original). En un video real codificado, el **video** de ningún segmento supera su tope en más de 25 % (el audio se copia del original y no cuenta) y la calidad 1080p de un video exigente usa más de 3.5 Mbps (el tope anterior era 3). |
 
 ## Fase 3 — Catálogo: modelo de datos y gestión de películas
 

@@ -32,6 +32,10 @@ jobs:
           pnpm typecheck
           pnpm lint
 
+      # VID-08 codifica un video real con scripts/encode-hls.sh
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Unit tests
         run: pnpm test
 

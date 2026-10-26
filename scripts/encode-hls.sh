@@ -3,7 +3,8 @@
 #
 #   scripts/encode-hls.sh "<video original>" <carpeta de salida> [segundos]
 #
-# - Calidades: la original + 1280/854/640 de ancho (solo las menores que el original)
+# - Calidades: la original + 1080p/720p/480p/360p (solo las menores), con CRF y tope de bitrate
+#   por resolución (VID-08, scripts/hls-ladder.mjs)
 # - Keyframe cada 6 s exactos y sin cortes por escena -> segmentos de 6 s alineados entre calidades
 # - Audio copiado sin recodificar (no pierde calidad)
 # - [segundos] opcional: codifica solo ese tramo (para pruebas rápidas)
@@ -16,22 +17,16 @@ SEGMENT=6
 PRESET="${PRESET:-slow}"
 
 probe() { ffprobe -v error -select_streams v:0 -show_entries "stream=$1" -of default=nw=1:nk=1 "$IN"; }
-# Nombre por ancho, como se conocen las calidades (1920x800 en 2.4:1 sigue siendo "1080p")
-label() { if (( $1 >= 3840 )); then echo 2160p; elif (( $1 >= 2560 )); then echo 1440p; elif (( $1 >= 1920 )); then echo 1080p; elif (( $1 >= 1280 )); then echo 720p; elif (( $1 >= 854 )); then echo 480p; else echo 360p; fi; }
 WIDTH=$(probe width)
 FPS_FRAC=$(probe r_frame_rate)
 # keyint = fps * 6, redondeado (23.976 fps -> 144 frames = 6.006 s)
 KEYINT=$(python3 -c "from fractions import Fraction as F; print(round(F('$FPS_FRAC') * $SEGMENT))")
 
-# ancho -> crf, maxrate (kbps); la primera es siempre el original
-declare -a WIDTHS=("$WIDTH") CRFS=(19) MAXRATES=(3000) NAMES=("$(label "$WIDTH")")
-for rung in "1280 21 1600" "854 22 900" "640 23 500"; do
-  read -r w crf rate <<<"$rung"
-  if (( w < WIDTH )); then
-    WIDTHS+=("$w"); CRFS+=("$crf"); MAXRATES+=("$rate")
-    NAMES+=("$(label "$w")")
-  fi
-done
+# Calidades, CRF y topes por resolución (VID-08): scripts/hls-ladder.mjs, probado en tests/unit
+declare -a WIDTHS=() NAMES=() CRFS=() MAXRATES=()
+while read -r w name crf rate; do
+  WIDTHS+=("$w"); NAMES+=("$name"); CRFS+=("$crf"); MAXRATES+=("$rate")
+done < <(node "$(dirname "$0")/hls-ladder.mjs" "$WIDTH")
 N=${#WIDTHS[@]}
 
 FILTER="[0:v]split=$N$(for i in $(seq 0 $((N-1))); do printf '[s%d]' "$i"; done)"
