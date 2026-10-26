@@ -36,7 +36,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await adminClient().from('movies').delete().like('slug', 'it-thumb-%')
+  await adminClient().from('movies').delete().like('slug', 'thumbit-%')
   await deleteUsers([boss.id])
   vi.unstubAllEnvs()
   server.close()
@@ -46,7 +46,7 @@ const uniq = () => Math.random().toString(36).slice(2, 8)
 const fields = (overrides: Record<string, string>) =>
   formData({
     title: 'Póster IT',
-    slug: `it-thumb-${uniq()}`,
+    slug: `thumbit-${uniq()}`,
     original_title: '',
     synopsis: '',
     release_year: '2025',

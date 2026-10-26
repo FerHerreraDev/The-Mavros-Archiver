@@ -1,5 +1,4 @@
 import 'server-only'
-import sharp from 'sharp'
 import { rgbaToThumbHash } from 'thumbhash'
 import { fetchPosterBytes, type FetchPosterOptions } from './fetch-poster'
 
@@ -8,6 +7,9 @@ const MAX_INPUT_PIXELS = 40_000_000
 
 /** ThumbHash (base64) de una imagen. ThumbHash pide ≤100 px por lado. */
 export async function thumbhashFromImage(bytes: Buffer): Promise<string> {
+  // sharp es nativo: se carga aquí y no al importar el módulo. Si su binario falla en el servidor,
+  // solo falla la vista previa; la página de edición y el guardado siguen funcionando (LOAD-03)
+  const { default: sharp } = await import('sharp')
   const { data, info } = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS })
     .rotate() // respeta la orientación EXIF
     .resize(100, 100, { fit: 'inside' })
