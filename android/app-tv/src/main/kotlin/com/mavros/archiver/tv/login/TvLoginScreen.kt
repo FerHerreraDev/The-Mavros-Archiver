@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.design.MavrosLoader
 
@@ -49,8 +50,13 @@ fun TvLoginScreen(state: TvLoginState) {
         )
         when (state) {
             TvLoginState.Requesting, TvLoginState.SignedIn -> MavrosLoader(Modifier.align(Alignment.Center).testTag("tv-loading"), size = 72.dp)
-            TvLoginState.Offline -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Sin conexión. Revisa el internet de la tele.", color = MavrosColors.Foreground, style = MaterialTheme.typography.titleLarge)
+            is TvLoginState.Unavailable -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    if (state.error == DataError.Network) "Sin conexión. Revisa el internet de la tele."
+                    else "No se pudo pedir un código al servidor.",
+                    color = MavrosColors.Foreground,
+                    style = MaterialTheme.typography.titleLarge,
+                )
                 Spacer(Modifier.height(8.dp))
                 Text("Reintentando…", color = MavrosColors.MutedForeground)
             }

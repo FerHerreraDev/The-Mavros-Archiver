@@ -1,5 +1,8 @@
 package com.mavros.archiver.tv
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -51,6 +54,16 @@ class TvScreensTest {
         content { TvLoginScreen(TvLoginState.Showing(code, CodeNotice.Expired, offline = true)) }
         compose.onNodeWithTag("tv-notice").assertTextContains("caducó", substring = true)
         compose.onNodeWithTag("tv-offline").assertIsDisplayed()
+    }
+
+    @Test fun `TV-03 sin red dice Sin conexion y si el servidor falla lo dice distinto`() {
+        var state by mutableStateOf<TvLoginState>(TvLoginState.Unavailable(com.mavros.archiver.core.data.DataError.Network))
+        content { TvLoginScreen(state) }
+        compose.onNodeWithText("Sin conexión", substring = true).assertIsDisplayed()
+        state = TvLoginState.Unavailable(com.mavros.archiver.core.data.DataError.Server)
+        compose.waitForIdle()
+        compose.onNodeWithText("No se pudo pedir un código", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Sin conexión", substring = true).assertDoesNotExist()
     }
 
     private val catalog = Catalog(

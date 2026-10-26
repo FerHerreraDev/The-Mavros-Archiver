@@ -51,11 +51,14 @@ private fun code(n: Int) = DeviceCode("dc-$n", "ABCD-EFG$n", "https://mavros.tes
 /** Dispositivo falso: entrega códigos en orden y responde el sondeo con lo que diga [polls] */
 private class FakeDevice(val polls: ArrayDeque<DataResult<DevicePoll>> = ArrayDeque()) : DeviceAuthRepository {
     var codes = 0
-    var codeFailures = 0
+    /** Errores a devolver al pedir código, en orden */
+    val codeErrors = ArrayDeque<DataError>()
+    val requestedAt = mutableListOf<Long>()
     val polledAt = mutableListOf<Long>()
     var clock: () -> Long = { 0 }
     override suspend fun requestCode(clientName: String): DataResult<DeviceCode> {
-        if (codeFailures > 0) { codeFailures--; return DataResult.Failure(DataError.Network) }
+        requestedAt += clock()
+        codeErrors.removeFirstOrNull()?.let { return DataResult.Failure(it) }
         return DataResult.Success(code(++codes))
     }
     override suspend fun poll(deviceCode: String): DataResult<DevicePoll> {
@@ -130,13 +133,38 @@ class TvLoginViewModelTest {
         assertEquals(TvLoginState.Showing(code(2), CodeNotice.Failed), vm.state.value)
     }
 
-    @Test fun `sin red al pedir codigo - lo dice y reintenta solo`() {
-        val device = FakeDevice().apply { codeFailures = 1 }
+    @Test fun `sin red al pedir codigo - dice Sin conexion y reintenta solo`() {
+        val device = FakeDevice().apply { codeErrors += DataError.Network }
         val vm = vm(device)
         scheduler.advanceTimeBy(1); scheduler.runCurrent()
-        assertEquals(TvLoginState.Offline, vm.state.value)
+        assertEquals(TvLoginState.Unavailable(DataError.Network), vm.state.value)
         scheduler.advanceTimeBy(TvLoginViewModel.RETRY_MS); scheduler.runCurrent()
         assertEquals(TvLoginState.Showing(code(1)), vm.state.value)
+    }
+
+    @Test fun `TV-03 el servidor rechaza (p ej demasiados intentos) - dice la causa real, no Sin conexion`() {
+        val device = FakeDevice().apply { codeErrors += DataError.Server }
+        val vm = vm(device)
+        scheduler.advanceTimeBy(1); scheduler.runCurrent()
+        assertEquals(TvLoginState.Unavailable(DataError.Server), vm.state.value)
+    }
+
+    @Test fun `TV-03 reintenta cada vez mas espaciado - 5, 10, 20, 40 s y luego cada 60 s`() {
+        val device = FakeDevice().apply { repeat(6) { codeErrors += DataError.Server } }
+        vm(device)
+        scheduler.advanceTimeBy(5 * 60_000L); scheduler.runCurrent()
+        val gaps = device.requestedAt.zipWithNext { a, b -> b - a }
+        assertEquals(listOf(5_000L, 10_000L, 20_000L, 40_000L, 60_000L, 60_000L), gaps.take(6))
+    }
+
+    @Test fun `TV-03 tras conseguir codigo, el siguiente fallo vuelve a empezar en 5 s`() {
+        val device = FakeDevice(ArrayDeque(listOf(DataResult.Success(DevicePoll.Expired)))).apply {
+            codeErrors += DataError.Server; codeErrors += DataError.Server
+        }
+        vm(device)
+        scheduler.advanceTimeBy(60_000); scheduler.runCurrent()
+        // falla (5 s) → falla (10 s) → código → caduca a los 5 s → pide otro de inmediato y lo obtiene
+        assertEquals(listOf(5_000L, 10_000L, 5_000L), device.requestedAt.zipWithNext { a, b -> b - a }.take(3))
     }
 
     @Test fun `sin red al sondear - conserva el codigo, avisa y sigue`() {

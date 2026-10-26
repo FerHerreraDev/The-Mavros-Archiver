@@ -81,7 +81,10 @@ class HttpDeviceAuthRepository(
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject { put("client_name", clientName) }.toString())
         }
-        if (res.status != HttpStatusCode.OK) return@call DataResult.Failure(DataError.Server)
+        if (res.status != HttpStatusCode.OK) {
+            System.err.println("[Mavros] /api/device/code respondió ${res.status.value}") // p. ej. 429 = demasiados intentos
+            return@call DataResult.Failure(DataError.Server)
+        }
         val b = json.decodeFromString<CodeBody>(res.bodyAsText())
         DataResult.Success(DeviceCode(b.deviceCode, b.userCode, b.verificationUri, b.verificationUriComplete, b.expiresIn, b.interval))
     }
@@ -112,6 +115,8 @@ class HttpDeviceAuthRepository(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
+        // Diagnóstico en logcat (System.err): tipo y mensaje del error, nunca tokens ni cuerpos
+        System.err.println("[Mavros] /api/device falló: ${e::class.simpleName}: ${e.message}")
         DataResult.Failure(e.toDataError())
     }
 }

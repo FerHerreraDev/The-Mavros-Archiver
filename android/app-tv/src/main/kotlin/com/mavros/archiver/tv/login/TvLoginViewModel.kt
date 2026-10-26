@@ -20,7 +20,8 @@ enum class CodeNotice { Expired, Denied, Failed }
 sealed interface TvLoginState {
     data object Requesting : TvLoginState
     data class Showing(val code: DeviceCode, val notice: CodeNotice? = null, val offline: Boolean = false) : TvLoginState
-    data object Offline : TvLoginState
+    /** No se pudo pedir código: [error] dice si fue la red o el servidor (TV-03) */
+    data class Unavailable(val error: DataError) : TvLoginState
     data object SignedIn : TvLoginState
 }
 
@@ -42,15 +43,19 @@ class TvLoginViewModel(
 
     private suspend fun kotlinx.coroutines.CoroutineScope.run() {
         var notice: CodeNotice? = null
+        var retry = RETRY_MS
         while (isActive) {
             val code = when (val result = device.requestCode(clientName)) {
                 is DataResult.Success -> result.value
                 is DataResult.Failure -> {
-                    _state.value = TvLoginState.Offline
-                    delay(RETRY_MS)
+                    _state.value = TvLoginState.Unavailable(result.error)
+                    // Cada vez más espaciado: insistir cada 5 s mantiene activo el límite de intentos
+                    delay(retry)
+                    retry = (retry * 2).coerceAtMost(MAX_RETRY_MS)
                     continue
                 }
             }
+            retry = RETRY_MS
             _state.value = TvLoginState.Showing(code, notice)
             notice = pollUntilDone(code) ?: return
         }
@@ -90,5 +95,6 @@ class TvLoginViewModel(
 
     companion object {
         const val RETRY_MS = 5_000L
+        const val MAX_RETRY_MS = 60_000L
     }
 }
