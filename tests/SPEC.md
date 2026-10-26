@@ -191,6 +191,7 @@ Pensado para varios clientes (web y la futura app Android en Kotlin): las reglas
 | MOV-11 | Un admin puede editar, publicar, despublicar y borrar. Borrar pide confirmación y no toca los archivos en R2. |
 | MOV-12 | Un `user` que entra a `/dashboard/admin/movies` vuelve a `/dashboard`; todas las acciones de películas rechazan a anónimos y `user` sin cambiar nada. |
 | MOV-13 | El panel admin tiene pestañas **Usuarios** / **Películas**. |
+| MOV-14 | Al tocar **Editar** o **Nueva película**, el botón muestra **de inmediato** que está cargando (indicador girando, anunciado como "Cargando…") hasta que abre el formulario, aunque el servidor tarde. |
 
 ## Fase 4 — Acceso protegido al video
 

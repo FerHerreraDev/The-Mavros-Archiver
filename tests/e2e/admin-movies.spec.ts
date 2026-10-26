@@ -112,3 +112,27 @@ test('MOV-11 editar, publicar, despublicar y borrar con confirmación', async ({
   await row(page, edited).getByRole('button', { name: `Confirmar borrar ${edited}` }).click()
   await expect(row(page, edited)).toHaveCount(0)
 })
+
+test('MOV-14 Editar y Nueva película muestran al instante que están cargando', async ({ page }) => {
+  const title = `E2E Lento ${uniq()}`
+  await loginAs(page, admin)
+  await createMovie(page, title)
+  await expect(row(page, title)).toBeVisible()
+
+  // Servidor lento: las páginas de editar y de nueva película tardan 2 s en responder
+  await page.route(/\/dashboard\/admin\/movies\/([^/]+\/edit|new)(\?|$)/, async (route) => {
+    await new Promise((r) => setTimeout(r, 2000))
+    await route.continue()
+  })
+
+  const edit = row(page, title).getByRole('link', { name: `Editar ${title}` })
+  await edit.click()
+  await expect(edit.getByText('Cargando…')).toBeAttached({ timeout: 500 })
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue(title, { timeout: 10_000 })
+
+  await page.goto('/dashboard/admin/movies')
+  const create = page.getByRole('link', { name: /nueva película/i })
+  await create.click()
+  await expect(create.getByText('Cargando…')).toBeAttached({ timeout: 500 })
+  await expect(page.getByRole('heading', { name: 'Nueva película' })).toBeVisible({ timeout: 10_000 })
+})

@@ -7,6 +7,7 @@ import { Pencil, Eye, EyeOff, Trash2, Film } from 'lucide-react'
 import { setMovieStatusAction, deleteMovieAction, type MovieActionResult } from '@/lib/actions/movie.actions'
 import { formatDuration, type Movie } from '@/lib/movies'
 import { cn } from '@/lib/utils'
+import { LinkPendingIcon } from '@/components/ui/link-pending'
 
 const ACTION_BUTTON =
   'inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-card hover:text-foreground text-muted-foreground transition-colors disabled:opacity-50 disabled:pointer-events-none'
@@ -99,7 +100,9 @@ function MovieRow({ movie }: { movie: Movie }) {
       <td className="px-6 py-3">
         <div className="flex flex-wrap justify-end gap-2">
           <Link href={`/dashboard/admin/movies/${movie.id}/edit`} className={ACTION_BUTTON} aria-label={`Editar ${movie.title}`}>
-            <Pencil className="h-3.5 w-3.5" />
+            <LinkPendingIcon>
+              <Pencil className="h-3.5 w-3.5" />
+            </LinkPendingIcon>
             Editar
           </Link>
           <button

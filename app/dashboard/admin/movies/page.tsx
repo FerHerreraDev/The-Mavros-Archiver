@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { LinkPendingIcon } from '@/components/ui/link-pending'
 import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { getSessionUser } from '@/lib/auth/guards'
@@ -27,7 +28,9 @@ export default async function AdminMoviesPage() {
           href="/dashboard/admin/movies/new"
           className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <LinkPendingIcon className="h-4 w-4">
+            <Plus className="h-4 w-4" />
+          </LinkPendingIcon>
           Nueva película
         </Link>
       </div>
