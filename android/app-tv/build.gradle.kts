@@ -140,8 +140,10 @@ dependencies {
 
 // prodRelease sin la llave del dueño saldría sin firmar (no instalable): mejor fallar con instrucciones
 tasks.matching { it.name == "assembleProdRelease" || it.name == "packageProdRelease" }.configureEach {
+    // Variable local: las lambdas no deben capturar el script (caché de configuración de Gradle)
+    val hasKey = releaseKeys != null
     doFirst {
-        check(releaseKeys != null) {
+        check(hasKey) {
             "Falta ~/.mavros/keystore.properties con tu llave de firma. Créala con android/scripts/create-release-key.sh"
         }
     }
