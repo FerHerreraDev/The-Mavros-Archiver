@@ -150,6 +150,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 |---|---|
 | UI-02 | Todo texto visible tiene contraste legible contra el fondo (WCAG AA: ≥ 4.5 para texto normal, ≥ 3 para texto grande) en las páginas de acceso (`/login`, `/forgot-password`, `/link`). |
 | UI-01 | En un teléfono (390 px de ancho) ninguna página (login, catálogo, reproducción, perfil, admin y películas) tiene scroll horizontal; los enlaces del navbar siguen accesibles por nombre. |
+| UI-03 | Todo campo para escribir (input, textarea, select) se distingue como campo: su contorno **o** su fondo contrasta ≥ 3:1 con lo que lo rodea (WCAG 1.4.11), y al enfocarse muestra un anillo de foco que también contrasta ≥ 3:1. Aplica a login, recuperar contraseña, nueva contraseña, `/link`, invitar usuarios y el formulario de películas. |
 
 ## Contenido — pipeline de video (HLS)
 

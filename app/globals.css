@@ -25,6 +25,8 @@
   
   --color-border: oklch(0.2 0 0);
   --color-input: oklch(0.1 0 0);
+  /* Contorno de los campos: ≥ 3:1 contra el fondo y las tarjetas (UI-03, WCAG 1.4.11) */
+  --color-field: oklch(0.52 0 0);
   --color-ring: oklch(0.4 0 0);
   
   --radius: 0.625rem;

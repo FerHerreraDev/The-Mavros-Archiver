@@ -100,7 +100,7 @@ export function MovieForm({ action, movie, submitLabel }: Props) {
               defaultValue={movie?.synopsis ?? ''}
               rows={4}
               maxLength={2000}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full rounded-lg border border-field bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/40"
             />
           )}
         </div>
