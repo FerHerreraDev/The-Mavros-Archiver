@@ -14,7 +14,12 @@ APP_ID="com.mavros.archiver.local"
 
 # SOLO emuladores: la prueba borra datos de la app y siembra usuarios. Nunca se toca un
 # teléfono real aunque esté conectado (todos los adb llevan -s con el serial del emulador).
-emulator_serial() { adb devices | awk 'NR>1 && $1 ~ /^emulator-/ && $2=="device" {print $1; exit}'; }
+# Solo emuladores de TELÉFONO: los de TV (android.software.leanback) son para scripts/e2e-tv.sh
+emulator_serial() {
+  adb devices | awk 'NR>1 && $1 ~ /^emulator-/ && $2=="device" {print $1}' | while read -r s; do
+    adb -s "$s" shell pm list features 2>/dev/null | grep -q "android.software.leanback" || { echo "$s"; break; }
+  done
+}
 SERIAL="$(emulator_serial)"
 if [ -z "$SERIAL" ]; then
   echo "Arrancando emulador $AVD…"

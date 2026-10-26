@@ -1,0 +1,186 @@
+package com.mavros.archiver.tv
+
+import android.view.KeyEvent
+import androidx.compose.ui.graphics.asAndroidBitmap
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.qrcode.QRCodeReader
+import com.mavros.archiver.core.data.AuthRepository
+import com.mavros.archiver.core.data.DataError
+import com.mavros.archiver.core.data.DataResult
+import com.mavros.archiver.core.data.DeviceAuthRepository
+import com.mavros.archiver.core.data.DeviceCode
+import com.mavros.archiver.core.data.DevicePoll
+import com.mavros.archiver.core.data.DeviceTokens
+import com.mavros.archiver.core.data.LoginError
+import com.mavros.archiver.core.data.SessionState
+import com.mavros.archiver.core.model.Catalog
+import com.mavros.archiver.core.model.ContinueItem
+import com.mavros.archiver.core.model.Movie
+import com.mavros.archiver.tv.catalog.tvRows
+import com.mavros.archiver.tv.login.CodeNotice
+import com.mavros.archiver.tv.login.TvLoginState
+import com.mavros.archiver.tv.login.TvLoginViewModel
+import com.mavros.archiver.tv.login.qrBitmap
+import com.mavros.archiver.tv.player.TvPlayerAction
+import com.mavros.archiver.tv.player.tvPlayerAction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+fun movie(id: String, title: String = "Película $id", genres: List<String> = emptyList(), duration: Int = 6000) =
+    Movie(id = id, slug = "slug-$id", title = title, durationSeconds = duration, genres = genres, releaseYear = 2025)
+
+private fun code(n: Int) = DeviceCode("dc-$n", "ABCD-EFG$n", "https://mavros.test/link", "https://mavros.test/link?code=ABCD-EFG$n", 600, 5)
+
+/** Dispositivo falso: entrega códigos en orden y responde el sondeo con lo que diga [polls] */
+private class FakeDevice(val polls: ArrayDeque<DataResult<DevicePoll>> = ArrayDeque()) : DeviceAuthRepository {
+    var codes = 0
+    var codeFailures = 0
+    val polledAt = mutableListOf<Long>()
+    var clock: () -> Long = { 0 }
+    override suspend fun requestCode(clientName: String): DataResult<DeviceCode> {
+        if (codeFailures > 0) { codeFailures--; return DataResult.Failure(DataError.Network) }
+        return DataResult.Success(code(++codes))
+    }
+    override suspend fun poll(deviceCode: String): DataResult<DevicePoll> {
+        polledAt += clock()
+        return polls.removeFirstOrNull() ?: DataResult.Success(DevicePoll.Pending)
+    }
+}
+
+private class FakeAuth(var accept: Boolean = true) : AuthRepository {
+    val imported = mutableListOf<DeviceTokens>()
+    override val session = MutableStateFlow<SessionState>(SessionState.SignedOut)
+    override suspend fun signIn(email: String, password: String): LoginError? = null
+    override suspend fun signOut() {}
+    override suspend fun validateSession() = true
+    override suspend fun onUnauthorized() {}
+    override suspend fun signInWithTokens(tokens: DeviceTokens): Boolean { imported += tokens; return accept }
+}
+
+/** TV-01 / TV-02 / TV-03 con reloj virtual */
+@OptIn(ExperimentalCoroutinesApi::class)
+class TvLoginViewModelTest {
+    private val scheduler = TestCoroutineScheduler()
+    @Before fun setUp() = Dispatchers.setMain(StandardTestDispatcher(scheduler))
+    @After fun tearDown() = Dispatchers.resetMain()
+
+    private fun vm(device: FakeDevice, auth: FakeAuth = FakeAuth()): TvLoginViewModel {
+        device.clock = { scheduler.currentTime }
+        return TvLoginViewModel(device, auth, "Hisense TV")
+    }
+
+    @Test fun `muestra el codigo y sondea cada interval segundos`() {
+        val device = FakeDevice()
+        val vm = vm(device)
+        scheduler.advanceTimeBy(1); scheduler.runCurrent()
+        assertEquals(TvLoginState.Showing(code(1)), vm.state.value)
+        scheduler.advanceTimeBy(15_001)
+        assertEquals(listOf(5_000L, 10_000L, 15_000L), device.polledAt.map { it - 1 + 1 })
+    }
+
+    @Test fun `slow_down suma 5 s al intervalo y se queda asi`() {
+        val device = FakeDevice(ArrayDeque(listOf(DataResult.Success(DevicePoll.SlowDown))))
+        vm(device)
+        scheduler.advanceTimeBy(30_001)
+        // 5 s → slow_down → cada 10 s: 15, 25
+        assertEquals(listOf(5_000L, 15_000L, 25_000L), device.polledAt)
+    }
+
+    @Test fun `aprobado - guarda la sesion recibida y termina`() {
+        val tokens = DeviceTokens("a", "r", 1)
+        val device = FakeDevice(ArrayDeque(listOf(DataResult.Success(DevicePoll.Pending), DataResult.Success(DevicePoll.Approved(tokens)))))
+        val auth = FakeAuth()
+        val vm = vm(device, auth)
+        scheduler.advanceTimeBy(60_000)
+        assertEquals(TvLoginState.SignedIn, vm.state.value)
+        assertEquals(listOf(tokens), auth.imported)
+        assertEquals(2, device.polledAt.size, "deja de sondear al entrar")
+    }
+
+    @Test fun `rechazado o caducado - codigo nuevo con aviso`() {
+        for ((poll, notice) in listOf(DevicePoll.Denied to CodeNotice.Denied, DevicePoll.Expired to CodeNotice.Expired, DevicePoll.Invalid to CodeNotice.Expired)) {
+            val device = FakeDevice(ArrayDeque(listOf(DataResult.Success(poll))))
+            val vm = vm(device)
+            scheduler.advanceTimeBy(5_001); scheduler.runCurrent()
+            assertEquals(TvLoginState.Showing(code(2), notice), vm.state.value, "$poll")
+        }
+    }
+
+    @Test fun `aprobado pero la sesion no sirve - codigo nuevo con aviso`() {
+        val device = FakeDevice(ArrayDeque(listOf(DataResult.Success(DevicePoll.Approved(DeviceTokens("a", "r", 1))))))
+        val vm = vm(device, FakeAuth(accept = false))
+        scheduler.advanceTimeBy(5_001); scheduler.runCurrent()
+        assertEquals(TvLoginState.Showing(code(2), CodeNotice.Failed), vm.state.value)
+    }
+
+    @Test fun `sin red al pedir codigo - lo dice y reintenta solo`() {
+        val device = FakeDevice().apply { codeFailures = 1 }
+        val vm = vm(device)
+        scheduler.advanceTimeBy(1); scheduler.runCurrent()
+        assertEquals(TvLoginState.Offline, vm.state.value)
+        scheduler.advanceTimeBy(TvLoginViewModel.RETRY_MS); scheduler.runCurrent()
+        assertEquals(TvLoginState.Showing(code(1)), vm.state.value)
+    }
+
+    @Test fun `sin red al sondear - conserva el codigo, avisa y sigue`() {
+        val device = FakeDevice(ArrayDeque(listOf(DataResult.Failure(DataError.Network), DataResult.Success(DevicePoll.Pending))))
+        val vm = vm(device)
+        scheduler.advanceTimeBy(5_001); scheduler.runCurrent()
+        assertEquals(TvLoginState.Showing(code(1), offline = true), vm.state.value)
+        scheduler.advanceTimeBy(5_000); scheduler.runCurrent()
+        assertEquals(TvLoginState.Showing(code(1)), vm.state.value)
+    }
+}
+
+class TvRowsTest {
+    @Test fun `TV-04 filas - seguir viendo, recien agregadas y una por genero, sin filas vacias`() {
+        val a = movie("a", genres = listOf("anime")); val b = movie("b", genres = listOf("acción", "anime")); val c = movie("c")
+        val rows = tvRows(Catalog(genres = listOf("acción", "anime", "terror"), recent = listOf(a, b, c), continueWatching = listOf(ContinueItem(b, 3000.0))))
+        assertEquals(listOf("Seguir viendo", "Recién agregadas", "Acción", "Anime"), rows.map { it.title })
+        assertEquals(listOf("b"), rows[0].movies.map { it.id })
+        assertEquals(0.5f, rows[0].progress["b"])
+        assertEquals(listOf("a", "b"), rows[3].movies.map { it.id })
+        assertTrue(tvRows(Catalog(emptyList(), emptyList(), emptyList())).isEmpty())
+    }
+}
+
+class TvPlayerKeysTest {
+    @Test fun `TV-06 botones del control`() {
+        assertEquals(TvPlayerAction.TogglePlay, tvPlayerAction(KeyEvent.KEYCODE_DPAD_CENTER))
+        assertEquals(TvPlayerAction.TogglePlay, tvPlayerAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+        assertEquals(TvPlayerAction.SeekBack, tvPlayerAction(KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(TvPlayerAction.SeekForward, tvPlayerAction(KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(TvPlayerAction.Exit, tvPlayerAction(KeyEvent.KEYCODE_BACK))
+        assertNull(tvPlayerAction(KeyEvent.KEYCODE_DPAD_UP), "arriba/abajo quedan para los controles del reproductor")
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@org.robolectric.annotation.Config(sdk = [35])
+class QrTest {
+    @Test fun `TV-01 el QR contiene exactamente la URL con el codigo`() {
+        val url = "https://the-mavros-archiver.vercel.app/link?code=ABCD-EFGH"
+        val bmp = qrBitmap(url).asAndroidBitmap()
+        val pixels = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
+        val decoded = QRCodeReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(bmp.width, bmp.height, pixels))))
+        assertEquals(url, decoded.text)
+    }
+}

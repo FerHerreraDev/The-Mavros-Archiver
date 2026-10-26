@@ -1,4 +1,4 @@
-package com.mavros.archiver.mobile.ui
+package com.mavros.archiver.core.design
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
@@ -18,8 +18,6 @@ import androidx.compose.ui.platform.testTag
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import com.mavros.archiver.core.design.REVEAL_FADE_MS
-import com.mavros.archiver.core.design.rememberReduceMotion
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.ThumbHash
 

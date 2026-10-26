@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.design.MavrosColors
+import com.mavros.archiver.core.design.PosterImage
 import com.mavros.archiver.core.design.MonoLabel
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.formatDurationShort

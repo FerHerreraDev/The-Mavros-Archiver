@@ -34,6 +34,7 @@ class PlaybackRepositoryTest {
         override suspend fun signOut() {}
         override suspend fun validateSession() = valid
         override suspend fun onUnauthorized() { unauthorized++ }
+        override suspend fun signInWithTokens(tokens: DeviceTokens) = false
     }
 
     private fun repo(auth: AuthRepository = FakeAuth(), withSession: Boolean = true, engine: MockEngine): HttpPlaybackRepository {

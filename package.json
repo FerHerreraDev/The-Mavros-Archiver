@@ -20,8 +20,9 @@
     "r2:upload": "scripts/r2-upload.sh",
     "video:deploy": "pnpm dlx wrangler@4.152.0 deploy --config workers/video/wrangler.toml",
     "video:url": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/video-url.ts",
-    "android:test": "cd android && ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest :core:data:integrationTest",
-    "android:e2e": "android/scripts/e2e-emulator.sh"
+    "android:test": "cd android && ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest :app-tv:testLocalDebugUnitTest :core:data:integrationTest",
+    "android:e2e": "android/scripts/e2e-emulator.sh",
+    "android:e2e:tv": "android/scripts/e2e-tv.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

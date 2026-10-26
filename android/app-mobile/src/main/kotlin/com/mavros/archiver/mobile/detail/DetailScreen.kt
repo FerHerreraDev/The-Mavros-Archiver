@@ -1,5 +1,9 @@
 package com.mavros.archiver.mobile.detail
 
+import com.mavros.archiver.core.android.detail.DetailUiState
+import com.mavros.archiver.core.android.detail.DetailViewModel
+import com.mavros.archiver.core.android.detail.playLabel
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -44,14 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mavros.archiver.core.design.MavrosColors
+import com.mavros.archiver.core.design.PosterImage
 import com.mavros.archiver.core.design.MonoLabel
 import com.mavros.archiver.core.model.MovieDetail
 import com.mavros.archiver.core.model.ProgressRules
 import com.mavros.archiver.core.model.formatDuration
-import com.mavros.archiver.core.model.formatTimestamp
 import com.mavros.archiver.mobile.ui.ErrorState
 import com.mavros.archiver.mobile.ui.DetailSkeleton
-import com.mavros.archiver.mobile.ui.PosterImage
 
 @Composable
 fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit) {
@@ -65,11 +68,6 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie:
     DetailContent(state, onBack, { start -> (state as? DetailUiState.Content)?.detail?.movie?.let { onPlay(it, start) } }, viewModel::retry)
 }
 
-/** Texto del botón según el progreso (MOB-08, reglas de PRG-02) */
-fun playLabel(detail: MovieDetail): String {
-    val start = ProgressRules.resumePosition(detail.positionSeconds, detail.movie.durationSeconds)
-    return if (start > 0) "Continuar desde ${formatTimestamp(start)}" else "Reproducir"
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

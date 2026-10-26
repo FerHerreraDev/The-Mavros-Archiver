@@ -87,7 +87,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit + Robolectric
-        run: ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest --console=plain
+        run: ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest :app-tv:testLocalDebugUnitTest --console=plain
 
       - name: Start local Supabase
         run: pnpm db:start
@@ -98,8 +98,8 @@ jobs:
 
       - name: Build APKs and scan for server secrets (MOB-01)
         run: |
-          ./gradlew :app-mobile:assembleLocalDebug :app-mobile:assembleProdDebug --console=plain
-          for apk in app-mobile/build/outputs/apk/*/debug/*.apk; do scripts/check-apk-secrets.sh "$apk"; done
+          ./gradlew :app-mobile:assembleLocalDebug :app-mobile:assembleProdDebug :app-tv:assembleLocalDebug :app-tv:assembleProdDebug --console=plain
+          for apk in app-mobile/build/outputs/apk/*/debug/*.apk app-tv/build/outputs/apk/*/debug/*.apk; do scripts/check-apk-secrets.sh "$apk"; done
 
       - name: Upload test reports
         if: failure()

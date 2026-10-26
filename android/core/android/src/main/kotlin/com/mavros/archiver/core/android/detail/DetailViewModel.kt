@@ -1,4 +1,4 @@
-package com.mavros.archiver.mobile.detail
+package com.mavros.archiver.core.android.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +7,8 @@ import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.data.DataResult
 import com.mavros.archiver.core.data.ProgressRepository
 import com.mavros.archiver.core.model.MovieDetail
+import com.mavros.archiver.core.model.ProgressRules
+import com.mavros.archiver.core.model.formatTimestamp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
@@ -55,4 +57,10 @@ class DetailViewModel(
             }
         }
     }
+}
+
+/** Texto del botón según el progreso (MOB-08, reglas de PRG-02) */
+fun playLabel(detail: MovieDetail): String {
+    val start = ProgressRules.resumePosition(detail.positionSeconds, detail.movie.durationSeconds)
+    return if (start > 0) "Continuar desde ${formatTimestamp(start)}" else "Reproducir"
 }

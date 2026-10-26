@@ -1,5 +1,6 @@
 package com.mavros.archiver.core.data.integration
 
+import com.mavros.archiver.core.data.DeviceTokens
 import com.mavros.archiver.core.data.LoginError
 import com.mavros.archiver.core.data.SessionState
 import com.mavros.archiver.core.data.SupabaseAuthRepository
@@ -132,6 +133,29 @@ class AuthRepositoryIT {
         withTimeout(10_000) { while (secondClient.auth.currentSessionOrNull()?.expiresAt?.let { it < Clock.System.now() } != false) delay(100) }
         assertTrue(second.validateSession())
         assertNotNull(runCatching { storage.loadSession() }.getOrNull())
+    }
+
+    @Test fun `TV-02 la sesion recibida por codigo se guarda y funciona al reabrir`() = runBlocking<Unit> {
+        // Sesión emitida para el usuario (como la que entrega /api/device/token)
+        val issuer = createMavrosSupabase(LocalSupabase.config, MemorySessionManager())
+        LocalSupabase.signIn(issuer, user)
+        val s = issuer.auth.currentSessionOrNull()!!
+        val tokens = DeviceTokens(s.accessToken, s.refreshToken, s.expiresAt.epochSeconds)
+
+        val storage = MemorySessionManager()
+        val (tv, _) = repo(storage)
+        assertTrue(tv.signInWithTokens(tokens))
+        assertEquals(user.id, assertIs<SessionState.SignedIn>(tv.awaitState { it is SessionState.SignedIn }).userId)
+
+        val (reopened, _) = repo(storage)
+        assertIs<SessionState.SignedIn>(reopened.awaitState { it !is SessionState.Loading })
+    }
+
+    @Test fun `TV-02 tokens invalidos - no entra y no deja sesion`() = runBlocking<Unit> {
+        val storage = MemorySessionManager()
+        val (tv, client) = repo(storage)
+        assertFalse(tv.signInWithTokens(DeviceTokens("no.es.jwt", "no-existe", System.currentTimeMillis() / 1000 + 3600)))
+        assertNull(client.auth.currentSessionOrNull())
     }
 
     @Test fun `MOB-05 cerrar sesion borra la sesion guardada`() = runBlocking<Unit> {

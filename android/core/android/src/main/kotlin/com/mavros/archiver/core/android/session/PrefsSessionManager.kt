@@ -1,4 +1,4 @@
-package com.mavros.archiver.mobile.session
+package com.mavros.archiver.core.android.session
 
 import android.content.Context
 import io.github.jan.supabase.auth.SessionManager

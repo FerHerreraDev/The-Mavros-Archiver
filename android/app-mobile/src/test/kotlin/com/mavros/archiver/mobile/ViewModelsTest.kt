@@ -4,11 +4,11 @@ import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.data.DataResult
 import com.mavros.archiver.core.data.LoginError
 import com.mavros.archiver.core.model.MovieDetail
-import com.mavros.archiver.mobile.catalog.CatalogUiState
-import com.mavros.archiver.mobile.catalog.CatalogViewModel
-import com.mavros.archiver.mobile.detail.DetailUiState
-import com.mavros.archiver.mobile.detail.DetailViewModel
-import com.mavros.archiver.mobile.detail.playLabel
+import com.mavros.archiver.core.android.catalog.CatalogUiState
+import com.mavros.archiver.core.android.catalog.CatalogViewModel
+import com.mavros.archiver.core.android.detail.DetailUiState
+import com.mavros.archiver.core.android.detail.DetailViewModel
+import com.mavros.archiver.core.android.detail.playLabel
 import com.mavros.archiver.mobile.login.INVALID_CREDENTIALS_MESSAGE
 import com.mavros.archiver.mobile.login.LoginViewModel
 import com.mavros.archiver.mobile.login.NETWORK_MESSAGE

@@ -1,4 +1,4 @@
-package com.mavros.archiver.mobile.catalog
+package com.mavros.archiver.core.android.catalog
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

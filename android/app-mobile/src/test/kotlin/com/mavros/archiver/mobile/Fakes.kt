@@ -46,6 +46,14 @@ class FakeAuthRepository(initial: SessionState = SessionState.SignedOut) : AuthR
     override suspend fun onUnauthorized() {
         validateSession()
     }
+
+    var tokensResult = true
+    val importedTokens = mutableListOf<com.mavros.archiver.core.data.DeviceTokens>()
+    override suspend fun signInWithTokens(tokens: com.mavros.archiver.core.data.DeviceTokens): Boolean {
+        importedTokens += tokens
+        if (tokensResult) state.value = SessionState.SignedIn("tv-user", "tv@test")
+        return tokensResult
+    }
 }
 
 class FakeCatalogRepository : CatalogRepository {
@@ -89,6 +97,10 @@ class FakeContainer(
     override val catalog: FakeCatalogRepository = FakeCatalogRepository(),
     override val playback: FakePlaybackRepository = FakePlaybackRepository(),
     override val progress: FakeProgressRepository = FakeProgressRepository(),
+    override val device: com.mavros.archiver.core.data.DeviceAuthRepository = object : com.mavros.archiver.core.data.DeviceAuthRepository {
+        override suspend fun requestCode(clientName: String) = DataResult.Failure(com.mavros.archiver.core.data.DataError.Server)
+        override suspend fun poll(deviceCode: String) = DataResult.Failure(com.mavros.archiver.core.data.DataError.Server)
+    },
 ) : AppContainer {
     override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 }

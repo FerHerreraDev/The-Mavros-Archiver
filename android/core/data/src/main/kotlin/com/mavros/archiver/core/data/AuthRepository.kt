@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.exceptions.RestException
+import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,9 @@ interface AuthRepository {
 
     /** Un endpoint respondió 401/403 con esta sesión: se trata como sesión inválida (MOB-06) */
     suspend fun onUnauthorized()
+
+    /** La tele recibió una sesión por código (TV-02): se guarda como una sesión normal. false si no sirve. */
+    suspend fun signInWithTokens(tokens: DeviceTokens): Boolean
 }
 
 class SupabaseAuthRepository(
@@ -102,6 +106,27 @@ class SupabaseAuthRepository(
             // Sin red no se cierra la sesión: se vuelve a validar más tarde
             true
         }
+    }
+
+    override suspend fun signInWithTokens(tokens: DeviceTokens): Boolean = try {
+        val expiresAt = kotlin.time.Instant.fromEpochSeconds(tokens.expiresAtEpochSeconds)
+        client.auth.importSession(
+            UserSession(
+                accessToken = tokens.accessToken,
+                refreshToken = tokens.refreshToken,
+                expiresIn = (tokens.expiresAtEpochSeconds - System.currentTimeMillis() / 1000).coerceAtLeast(0),
+                tokenType = "bearer",
+                user = null,
+                expiresAt = expiresAt,
+            ),
+        )
+        // Completa el usuario y confirma con el servidor que la sesión vale (renueva si hace falta)
+        validateSession()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        runCatching { client.auth.clearSession() }
+        false
     }
 
     override suspend fun onUnauthorized() {

@@ -1,4 +1,4 @@
-package com.mavros.archiver.mobile.player
+package com.mavros.archiver.core.android.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

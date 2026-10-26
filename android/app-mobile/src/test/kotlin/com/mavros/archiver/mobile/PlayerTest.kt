@@ -16,12 +16,12 @@ import com.mavros.archiver.core.data.DataResult
 import com.mavros.archiver.core.data.PlaybackSource
 import com.mavros.archiver.core.design.MavrosTheme
 import com.mavros.archiver.core.model.MovieDetail
-import com.mavros.archiver.mobile.detail.DetailUiState
-import com.mavros.archiver.mobile.detail.DetailViewModel
+import com.mavros.archiver.core.android.detail.DetailUiState
+import com.mavros.archiver.core.android.detail.DetailViewModel
 import com.mavros.archiver.mobile.player.PlayerScreen
-import com.mavros.archiver.mobile.player.PlayerUiState
-import com.mavros.archiver.mobile.player.PlayerViewModel
-import com.mavros.archiver.mobile.player.qualityLabels
+import com.mavros.archiver.core.android.player.PlayerUiState
+import com.mavros.archiver.core.android.player.PlayerViewModel
+import com.mavros.archiver.core.android.player.qualityLabels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -110,7 +110,7 @@ class PlayerTest {
     @Test fun `MOB-19 el catalogo se recarga al guardar progreso (Seguir viendo)`() {
         val repo = FakeCatalogRepository()
         val progress = FakeProgressRepository()
-        com.mavros.archiver.mobile.catalog.CatalogViewModel(repo, progress)
+        com.mavros.archiver.core.android.catalog.CatalogViewModel(repo, progress)
         val before = repo.requestedGenres.size
         kotlinx.coroutines.runBlocking { progress.save("3", 3100.0) }
         assertEquals(before + 1, repo.requestedGenres.size)

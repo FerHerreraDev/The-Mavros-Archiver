@@ -33,11 +33,11 @@ import com.mavros.archiver.core.design.ShimmerAnimatedKey
 import com.mavros.archiver.core.model.Catalog
 import com.mavros.archiver.core.model.MovieDetail
 import com.mavros.archiver.mobile.catalog.CatalogContent
-import com.mavros.archiver.mobile.catalog.CatalogUiState
+import com.mavros.archiver.core.android.catalog.CatalogUiState
 import com.mavros.archiver.mobile.detail.DetailContent
-import com.mavros.archiver.mobile.detail.DetailUiState
+import com.mavros.archiver.core.android.detail.DetailUiState
 import com.mavros.archiver.mobile.ui.PosterCard
-import com.mavros.archiver.mobile.ui.thumbhashBitmap
+import com.mavros.archiver.core.design.thumbhashBitmap
 import kotlinx.coroutines.awaitCancellation
 import org.junit.After
 import org.junit.Before

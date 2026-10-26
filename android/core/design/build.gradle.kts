@@ -15,6 +15,8 @@ android {
 }
 
 dependencies {
+    api(project(":core:model"))
+    implementation(libs.coil.compose)
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.material3)

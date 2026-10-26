@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Banner del inicio de Google TV (TV-08): 320×180, "THE MAVROS ARCHIVER" con la M roja -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#FF030303" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FFE7000B"
+        android:pathData="M118,124V56h15l27,34l27,-34h15v68h-15V82l-27,33l-27,-33v42z" />
+    <path android:fillColor="#FF262626" android:pathData="M60,140h200v3h-200z" />
+</vector>

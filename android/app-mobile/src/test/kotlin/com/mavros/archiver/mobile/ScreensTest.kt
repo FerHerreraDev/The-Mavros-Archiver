@@ -22,9 +22,9 @@ import com.mavros.archiver.core.model.Catalog
 import com.mavros.archiver.core.model.ContinueItem
 import com.mavros.archiver.core.model.MovieDetail
 import com.mavros.archiver.mobile.catalog.CatalogContent
-import com.mavros.archiver.mobile.catalog.CatalogUiState
+import com.mavros.archiver.core.android.catalog.CatalogUiState
 import com.mavros.archiver.mobile.detail.DetailContent
-import com.mavros.archiver.mobile.detail.DetailUiState
+import com.mavros.archiver.core.android.detail.DetailUiState
 import com.mavros.archiver.mobile.login.LoginContent
 import com.mavros.archiver.mobile.login.LoginUiState
 import androidx.compose.runtime.getValue

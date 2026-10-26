@@ -19,9 +19,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.mavros.archiver.core.data.SessionState
 import com.mavros.archiver.mobile.catalog.CatalogScreen
-import com.mavros.archiver.mobile.catalog.CatalogViewModel
+import com.mavros.archiver.core.android.catalog.CatalogViewModel
 import com.mavros.archiver.mobile.detail.DetailScreen
-import com.mavros.archiver.mobile.detail.DetailViewModel
+import com.mavros.archiver.core.android.detail.DetailViewModel
 import com.mavros.archiver.mobile.login.LoginScreen
 import com.mavros.archiver.mobile.login.LoginViewModel
 import com.mavros.archiver.mobile.profile.ProfileScreen

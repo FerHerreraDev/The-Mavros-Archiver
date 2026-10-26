@@ -358,6 +358,21 @@ Mismas reglas que la web (PLY, WATCH, PRG), con el reproductor del sistema. La l
 | MOB-18 | Controles en la pantalla de bloqueo y en la notificación de medios (reproducir/pausa, título) mientras hay reproducción. |
 | MOB-19 | Al volver del reproductor, el detalle y "Seguir viendo" muestran el progreso nuevo. |
 
+## Fase A4 — App para la tele (Google TV)
+
+App aparte (`app-tv`) para Google TV / Android TV 9+, con la misma lógica que el teléfono (módulos `core:*`). Se maneja solo con el control remoto.
+
+| ID | Requisito |
+|---|---|
+| TV-01 | Sin sesión, la tele pide un código a `/api/device/code` y muestra el código `XXXX-XXXX` grande, la dirección para escribirlo y un **QR** de `verification_uri_complete`. Sondea `/api/device/token` cada `interval` s; ante `slow_down` suma 5 s al intervalo (RFC 8628). Nunca pide email ni contraseña en la tele. |
+| TV-02 | Al aprobarse, la sesión recibida (access + refresh token) se guarda como una sesión normal de Supabase y entra al catálogo. Al abrir otra vez sigue dentro (mismas reglas que MOB-04, MOB-06). |
+| TV-03 | Código caducado o rechazado → pide uno nuevo solo y avisa por qué ("El código caducó", "Se rechazó"). Sin red → lo dice y reintenta solo. |
+| TV-04 | Catálogo en filas: "Seguir viendo" (con barra de progreso), "Recién agregadas" y una por género. Se recorre con las flechas; la tarjeta enfocada se agranda y se resalta. Skeleton mientras carga (LOAD-01). |
+| TV-05 | Detalle: póster, título, año, duración, géneros, sinopsis y botón "Reproducir" / "Continuar desde mm:ss" (PRG-02), enfocado al abrir. |
+| TV-06 | Reproductor a pantalla completa con las mismas reglas que el teléfono: progreso (MOB-15) y token (MOB-16). Control: OK = pausa/reproduce, ←/→ = −/+10 s, Atrás = salir guardando. |
+| TV-07 | Se puede cerrar sesión desde la tele (vuelve a la pantalla del código). |
+| TV-08 | La app aparece en el inicio de Google TV (banner) y solo pide permiso de internet. |
+
 ## Estados de carga (web y Android)
 
 | ID | Requisito |

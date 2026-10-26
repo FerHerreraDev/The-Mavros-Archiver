@@ -1,5 +1,9 @@
 package com.mavros.archiver.mobile.player
 
+import com.mavros.archiver.core.android.player.PlayerUiState
+import com.mavros.archiver.core.android.player.PlayerViewModel
+import com.mavros.archiver.core.android.player.qualityLabels
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
