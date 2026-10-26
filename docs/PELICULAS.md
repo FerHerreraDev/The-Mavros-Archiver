@@ -38,3 +38,21 @@ En la web: **Admin → Películas → Nueva película**.
 - **Póster:** pega una URL `https://` de la imagen. El servidor guarda una copia optimizada y la
   vista previa borrosa; si la imagen original desaparece después, la app sigue usando la copia.
 - Se guarda como **borrador**: solo tú la ves. Revisa que se reproduzca y luego **Publicar**.
+
+## Calidad
+
+`hls:encode` usa una calidad alta por resolución (VID-08): la 1080p puede llegar a 6 Mbps (antes 3),
+la 720p a 3, la 480p a 1.4 y la 360p a 0.8; un original 4K usaría hasta 16 Mbps. Una película de 2 h
+en 1080p queda en unos **7–9 GB** en R2 (≈ US$0.12/mes cada una). El reproductor elige la calidad según
+tu conexión, o la eliges a mano.
+
+## Volver a convertir una película que ya está subida
+
+Para que una película vieja aproveche la calidad nueva, sin perder el progreso de nadie:
+
+1. Convierte y sube a una **carpeta nueva**: `movies/mi-pelicula-v2`.
+2. En **Admin → Películas → Editar**, cambia "Video (ruta en R2)" a `movies/mi-pelicula-v2/master.m3u8`
+   y guarda (el servidor verifica el video nuevo). El progreso se conserva: va ligado a la película,
+   no a la carpeta.
+3. Cuando confirmes que se ve bien, borra la carpeta vieja para no pagar su almacenamiento:
+   `rclone purge videos-backup:videos/movies/mi-pelicula`
