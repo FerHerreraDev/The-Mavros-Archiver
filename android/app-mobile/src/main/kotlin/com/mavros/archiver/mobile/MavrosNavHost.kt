@@ -28,12 +28,22 @@ import com.mavros.archiver.mobile.profile.ProfileScreen
 import com.mavros.archiver.mobile.series.SeriesScreen
 import com.mavros.archiver.core.android.series.SeriesViewModel
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.mavros.archiver.core.android.lists.AddToListViewModel
+import com.mavros.archiver.core.android.lists.ListsViewModel
+import com.mavros.archiver.core.android.lists.PlaylistViewModel
+import com.mavros.archiver.core.model.PlaylistTarget
+import com.mavros.archiver.mobile.lists.AddToListButton
+import com.mavros.archiver.mobile.lists.ListsContent
+import com.mavros.archiver.mobile.lists.PlaylistContent
 import kotlinx.serialization.Serializable
 
 @Serializable data object CatalogRoute
 @Serializable data class DetailRoute(val movieId: String)
 @Serializable data object ProfileRoute
 @Serializable data class SeriesRoute(val seriesId: String)
+@Serializable data object ListsRoute
+@Serializable data class PlaylistRoute(val playlistId: String)
 
 /**
  * Sin sesión solo existe el login; con sesión, catálogo/detalle/perfil.
@@ -64,6 +74,29 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 onOpenMovie = { nav.navigate(DetailRoute(it)) },
                 onOpenProfile = { nav.navigate(ProfileRoute) },
                 onOpenSeries = { nav.navigate(SeriesRoute(it)) },
+                onOpenLists = { nav.navigate(ListsRoute) },
+            )
+        }
+        composable<ListsRoute> {
+            val vm: ListsViewModel = viewModel(factory = viewModelFactory { initializer { ListsViewModel(container.playlists) } })
+            val state by vm.state.collectAsStateWithLifecycle()
+            LifecycleResumeEffect(Unit) {
+                vm.refresh()
+                onPauseOrDispose { }
+            }
+            ListsContent(state, onBack = { nav.popBackStack() }, onOpen = { nav.navigate(PlaylistRoute(it)) }, onRetry = vm::retry)
+        }
+        composable<PlaylistRoute> { entry ->
+            val context = LocalContext.current
+            val playlistId = entry.toRoute<PlaylistRoute>().playlistId
+            val vm: PlaylistViewModel = viewModel(key = playlistId, factory = viewModelFactory { initializer { PlaylistViewModel(container.playlists, playlistId, container.progress) } })
+            val state by vm.state.collectAsStateWithLifecycle()
+            PlaylistContent(
+                state,
+                onBack = { nav.popBackStack() },
+                onPlay = { detail -> detail.start?.let { context.startActivity(PlayerActivity.intent(context, it.episode, it.startAt, detail.playlist.id)) } },
+                onOpenItem = { item -> item.movie?.let { nav.navigate(DetailRoute(it.id)) } ?: item.series?.let { nav.navigate(SeriesRoute(it.id)) } },
+                onRetry = vm::retry,
             )
         }
         composable<SeriesRoute> { entry ->
@@ -74,6 +107,7 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 viewModel = vm,
                 onBack = { nav.popBackStack() },
                 onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
+                extra = { AddToList(container, PlaylistTarget.SeriesTarget(seriesId)) },
             )
         }
         composable<DetailRoute> { entry ->
@@ -84,6 +118,7 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 viewModel = vm,
                 onBack = { nav.popBackStack() },
                 onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
+                extra = { AddToList(container, PlaylistTarget.MovieTarget(movieId)) },
             )
         }
         composable<ProfileRoute> {
@@ -94,4 +129,12 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
             )
         }
     }
+}
+
+/** "Agregar a lista" con su ViewModel (uno por película/serie) */
+@Composable
+private fun AddToList(container: AppContainer, target: PlaylistTarget) {
+    val vm: AddToListViewModel = viewModel(key = "add-$target", factory = viewModelFactory { initializer { AddToListViewModel(container.playlists, target) } })
+    val state by vm.state.collectAsStateWithLifecycle()
+    AddToListButton(state, onOpen = vm::load, onToggle = vm::toggle, onCreate = vm::create)
 }

@@ -7,6 +7,7 @@ import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.data.DataResult
 import com.mavros.archiver.core.data.PlaybackRepository
 import com.mavros.archiver.core.data.PlaybackSource
+import com.mavros.archiver.core.data.PlaylistRepository
 import com.mavros.archiver.core.model.Movie
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,26 +22,37 @@ sealed interface PlayerUiState {
     data class Error(val error: DataError) : PlayerUiState
 }
 
+/** Lo que se ofrece al terminar: el siguiente episodio (SER-16) o lo siguiente de la lista (PL-07) */
+data class UpNext(val movie: Movie, val startAt: Double, val inList: Boolean) {
+    val heading: String get() = if (inList) "Siguiente en la lista" else "Siguiente episodio"
+}
+
 /**
  * Pide la primera URL firmada (MOB-13). Las renovaciones las hace PlaybackService.
- * Con [catalog], también busca el siguiente episodio para ofrecerlo al terminar (SER-16).
+ * Busca qué ofrecer al terminar: con [listId], lo siguiente de esa lista; si no, con [catalog], el
+ * siguiente episodio. Si falla no pasa nada: simplemente no se ofrece.
  */
 class PlayerViewModel(
     private val repository: PlaybackRepository,
     private val movieId: String,
     private val catalog: CatalogRepository? = null,
+    private val playlists: PlaylistRepository? = null,
+    private val listId: String? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading)
     val state: StateFlow<PlayerUiState> = _state
-    private val _next = MutableStateFlow<Movie?>(null)
-    val next: StateFlow<Movie?> = _next
+    private val _next = MutableStateFlow<UpNext?>(null)
+    val next: StateFlow<UpNext?> = _next
     private var job: Job? = null
 
     init {
         load()
-        catalog?.let { c ->
-            // Si falla no pasa nada: simplemente no se ofrece el siguiente
-            viewModelScope.launch { (c.nextEpisode(movieId) as? DataResult.Success)?.let { _next.value = it.value } }
+        viewModelScope.launch {
+            _next.value = if (listId != null) {
+                (playlists?.next(listId, movieId) as? DataResult.Success)?.value?.let { UpNext(it.episode, it.startAt, inList = true) }
+            } else {
+                (catalog?.nextEpisode(movieId) as? DataResult.Success)?.value?.let { UpNext(it, 0.0, inList = false) }
+            }
         }
     }
 

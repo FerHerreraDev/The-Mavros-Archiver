@@ -9,6 +9,8 @@ import com.mavros.archiver.core.data.HttpDeviceAuthRepository
 import com.mavros.archiver.core.data.HttpPlaybackRepository
 import com.mavros.archiver.core.data.MavrosConfig
 import com.mavros.archiver.core.data.PlaybackRepository
+import com.mavros.archiver.core.data.PlaylistRepository
+import com.mavros.archiver.core.data.SupabasePlaylistRepository
 import com.mavros.archiver.core.data.ProgressRepository
 import com.mavros.archiver.core.data.SupabaseAuthRepository
 import com.mavros.archiver.core.data.SupabaseCatalogRepository
@@ -25,6 +27,7 @@ interface MavrosContainer {
     val playback: PlaybackRepository
     val progress: ProgressRepository
     val device: DeviceAuthRepository
+    val playlists: PlaylistRepository
 
     /** Alcance de toda la app: logout y guardados no se cancelan aunque la pantalla desaparezca */
     val appScope: CoroutineScope
@@ -39,4 +42,5 @@ class DefaultMavrosContainer(app: Application, config: MavrosConfig) : MavrosCon
     override val playback: PlaybackRepository = HttpPlaybackRepository(config, supabase, auth)
     override val progress: ProgressRepository = SupabaseProgressRepository(supabase)
     override val device: DeviceAuthRepository = HttpDeviceAuthRepository(config)
+    override val playlists: PlaylistRepository = SupabasePlaylistRepository(supabase, auth)
 }

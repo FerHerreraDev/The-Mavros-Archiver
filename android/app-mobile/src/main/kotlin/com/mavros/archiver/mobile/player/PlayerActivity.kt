@@ -2,6 +2,7 @@ package com.mavros.archiver.mobile.player
 
 import com.mavros.archiver.core.android.player.PlayerUiState
 import com.mavros.archiver.core.android.player.PlayerViewModel
+import com.mavros.archiver.core.android.player.UpNext
 import com.mavros.archiver.core.android.player.qualityLabels
 
 import android.app.PictureInPictureParams
@@ -62,13 +63,16 @@ class PlayerActivity : ComponentActivity() {
         private const val TITLE = "title"
         private const val DURATION = "duration"
         private const val START_AT = "startAt"
+        private const val LIST_ID = "listId"
 
-        fun intent(context: Context, movie: Movie, startAtSeconds: Double): Intent =
+        /** Con [listId], al terminar ofrece lo siguiente de esa lista (PL-07) */
+        fun intent(context: Context, movie: Movie, startAtSeconds: Double, listId: String? = null): Intent =
             Intent(context, PlayerActivity::class.java)
                 .putExtra(MOVIE_ID, movie.id)
                 .putExtra(TITLE, movie.title)
                 .putExtra(DURATION, movie.durationSeconds)
                 .putExtra(START_AT, startAtSeconds)
+                .putExtra(LIST_ID, listId)
     }
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -118,7 +122,10 @@ class PlayerActivity : ComponentActivity() {
             MavrosTheme {
                 val movie = current
                 // Una por película: al pasar al siguiente episodio se pide su propia URL (SER-16)
-                val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory { initializer { PlayerViewModel(container.playback, movie.id, container.catalog) } })
+                val listId = intent.getStringExtra(LIST_ID)
+                val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory {
+                    initializer { PlayerViewModel(container.playback, movie.id, container.catalog, container.playlists, listId) }
+                })
                 val state by vm.state.collectAsStateWithLifecycle()
                 val next by vm.next.collectAsStateWithLifecycle()
                 val player = controller
@@ -179,14 +186,14 @@ class PlayerActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) { leave() }
     }
 
-    /** Siguiente episodio sin salir del reproductor: su propia URL, token y progreso (SER-16) */
-    private fun playNext(next: Movie) {
+    /** Siguiente episodio o de la lista sin salir del reproductor: su propia URL, token y progreso (SER-16, PL-07) */
+    private fun playNext(next: UpNext) {
         ended = false
         nextCancelled = false
         selectedHeight = null
-        // Si Android recrea la pantalla, sigue en este episodio
-        intent = intent(this, next, 0.0)
-        current = Current(next.id, next.title, next.durationSeconds, 0.0)
+        // Si Android recrea la pantalla, sigue en este; en modo lista, sigue en la lista
+        intent = intent(this, next.movie, next.startAt, intent.getStringExtra(LIST_ID))
+        current = Current(next.movie.id, next.movie.title, next.movie.durationSeconds, next.startAt)
     }
 
     /**

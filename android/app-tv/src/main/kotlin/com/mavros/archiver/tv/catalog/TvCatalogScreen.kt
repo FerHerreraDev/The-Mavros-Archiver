@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -85,7 +86,14 @@ fun tvRows(catalog: Catalog): List<TvRow> = buildList {
 }
 
 @Composable
-fun TvCatalogScreen(state: CatalogUiState, onOpenMovie: (String) -> Unit, onSignOut: () -> Unit, onRetry: () -> Unit, onOpenSeries: (String) -> Unit = {}) {
+fun TvCatalogScreen(
+    state: CatalogUiState,
+    onOpenMovie: (String) -> Unit,
+    onSignOut: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenSeries: (String) -> Unit = {},
+    onOpenLists: () -> Unit = {},
+) {
     val signOut = remember { FocusRequester() }
     Column(Modifier.fillMaxSize().background(MavrosColors.Background)) {
         Row(Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 32.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -98,6 +106,8 @@ fun TvCatalogScreen(state: CatalogUiState, onOpenMovie: (String) -> Unit, onSign
                 color = MavrosColors.Foreground,
                 modifier = Modifier.weight(1f),
             )
+            OutlinedButton(onClick = onOpenLists, modifier = Modifier.testTag("tv-open-lists")) { Text("Mis listas") }
+            Spacer(Modifier.width(16.dp))
             OutlinedButton(onClick = onSignOut, modifier = Modifier.focusRequester(signOut).testTag("tv-sign-out")) { Text("Cerrar sesión") }
         }
         when (state) {

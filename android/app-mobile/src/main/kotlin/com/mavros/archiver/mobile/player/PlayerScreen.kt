@@ -55,7 +55,7 @@ import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.design.MavrosLoader
 import com.mavros.archiver.core.android.player.NEXT_EPISODE_COUNTDOWN_SECONDS
-import com.mavros.archiver.core.model.Movie
+import com.mavros.archiver.core.android.player.UpNext
 import kotlinx.coroutines.delay
 
 /**
@@ -75,8 +75,8 @@ fun PlayerScreen(
     onSelectQuality: (Int?) -> Unit,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    nextEpisode: Movie? = null,
-    onPlayNext: (Movie) -> Unit = {},
+    nextEpisode: UpNext? = null,
+    onPlayNext: (UpNext) -> Unit = {},
     onCancelNext: () -> Unit = {},
     video: @Composable () -> Unit,
 ) {
@@ -109,11 +109,11 @@ fun PlayerScreen(
     }
 }
 
-/** "Siguiente episodio en 10 s" con Ver ahora / Cancelar (SER-16) */
+/** "Siguiente episodio en 10 s" (o "Siguiente en la lista") con Ver ahora / Cancelar (SER-16, PL-07) */
 @Composable
-fun NextEpisodeCard(next: Movie, onPlay: (Movie) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
-    var left by remember(next.id) { mutableIntStateOf(NEXT_EPISODE_COUNTDOWN_SECONDS) }
-    LaunchedEffect(next.id) {
+fun NextEpisodeCard(next: UpNext, onPlay: (UpNext) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    var left by remember(next.movie.id) { mutableIntStateOf(NEXT_EPISODE_COUNTDOWN_SECONDS) }
+    LaunchedEffect(next.movie.id) {
         while (left > 0) {
             delay(1_000)
             left--
@@ -130,8 +130,8 @@ fun NextEpisodeCard(next: Movie, onPlay: (Movie) -> Unit, onCancel: () -> Unit, 
             .testTag("next-episode"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Siguiente episodio en $left s", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.labelMedium, modifier = Modifier.testTag("next-countdown"))
-        Text("${next.episodeTag} · ${next.title}", color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text("${next.heading} en $left s", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.labelMedium, modifier = Modifier.testTag("next-countdown"))
+        Text(next.movie.episodeTag?.let { "$it · ${next.movie.title}" } ?: next.movie.title, color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { onPlay(next) }, shape = RoundedCornerShape(999.dp), modifier = Modifier.weight(1f).testTag("next-now")) { Text("Ver ahora") }
             TextButton(onClick = onCancel, modifier = Modifier.testTag("next-cancel")) { Text("Cancelar") }

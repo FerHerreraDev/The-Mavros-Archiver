@@ -1,7 +1,7 @@
 import { getSessionUser } from '@/lib/auth/guards'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Film, User, Shield } from 'lucide-react'
+import { Film, ListVideo, User, Shield } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth.actions'
 import { LogoutButton } from '@/components/auth/logout-button'
 
@@ -34,6 +34,10 @@ export default async function DashboardLayout({
               <Film className="w-4 h-4" /> <span className="sr-only sm:not-sr-only">Catálogo</span>
             </Link>
             
+            <Link href="/dashboard/lists" className="flex items-center gap-2 hover:text-red-500 transition-colors">
+              <ListVideo className="w-4 h-4" /> <span className="sr-only sm:not-sr-only">Mis listas</span>
+            </Link>
+
             <Link href="/dashboard/profile" className="flex items-center gap-2 hover:text-red-500 transition-colors">
               <User className="w-4 h-4" /> <span className="sr-only sm:not-sr-only">Perfil</span>
             </Link>

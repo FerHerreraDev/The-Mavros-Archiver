@@ -57,7 +57,7 @@ import com.mavros.archiver.mobile.ui.ErrorState
 import com.mavros.archiver.mobile.ui.DetailSkeleton
 
 @Composable
-fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit) {
+fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit, extra: @Composable () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Al volver del reproductor, el botón muestra el progreso nuevo (MOB-19)
     var resumed by remember { mutableStateOf(false) }
@@ -65,13 +65,13 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie:
         if (resumed) viewModel.refresh() else resumed = true
         onPauseOrDispose { }
     }
-    DetailContent(state, onBack, { start -> (state as? DetailUiState.Content)?.detail?.movie?.let { onPlay(it, start) } }, viewModel::retry)
+    DetailContent(state, onBack, { start -> (state as? DetailUiState.Content)?.detail?.movie?.let { onPlay(it, start) } }, viewModel::retry, extra)
 }
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailContent(state: DetailUiState, onBack: () -> Unit, onPlay: (Double) -> Unit, onRetry: () -> Unit) {
+fun DetailContent(state: DetailUiState, onBack: () -> Unit, onPlay: (Double) -> Unit, onRetry: () -> Unit, extra: @Composable () -> Unit = {}) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -88,13 +88,13 @@ fun DetailContent(state: DetailUiState, onBack: () -> Unit, onPlay: (Double) -> 
             DetailUiState.NotAvailable -> Box(Modifier.fillMaxSize().padding(padding).testTag("not-available"), contentAlignment = Alignment.Center) {
                 Text("Esta película no está disponible.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is DetailUiState.Content -> MovieDetailBody(state.detail, Modifier.padding(padding), onPlay)
+            is DetailUiState.Content -> MovieDetailBody(state.detail, Modifier.padding(padding), onPlay, extra)
         }
     }
 }
 
 @Composable
-private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Double) -> Unit) {
+private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Double) -> Unit, extra: @Composable () -> Unit) {
     val movie = detail.movie
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
@@ -137,6 +137,8 @@ private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Do
             Spacer(Modifier.width(8.dp))
             Text(playLabel(detail), fontWeight = FontWeight.SemiBold)
         }
+        // "Agregar a lista" (PL-07)
+        extra()
 
         movie.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("synopsis")) }
     }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import path from 'node:path'
 import type { Server } from 'node:http'
-import { createMovieAction } from '@/lib/actions/movie.actions'
+import { createMovieAction, updateMovieAction } from '@/lib/actions/movie.actions'
 import {
   createSeriesAction,
   deleteSeriesAction,
@@ -162,12 +162,23 @@ describe('episodios desde el formulario de película (SER-06)', () => {
     expect(list!.find((m) => m.id === data!.id)?.series?.title).toBe(`Serie ${tag}`)
   })
 
-  it('temporada/episodio repetidos → error en el campo', async () => {
+  it('temporada/episodio repetidos → error en el campo (con slug propio o generado)', async () => {
     const series = await insertSeries()
-    await insertEpisode(series.id, 1, 2)
+    await insertEpisode(series.id, 1, 2, { slug: `${series.slug}-s01e02` })
     await as(boss)
-    const result = await createMovieAction(episodeFields(series.id, { slug: `otro-${tag}-${uniq()}` }))
-    expect(result.fieldErrors?.episode_number?.[0]).toMatch(/ya existe/i)
+    for (const slug of [`otro-${tag}-${uniq()}`, '']) {
+      const result = await createMovieAction(episodeFields(series.id, { slug }))
+      expect(result.fieldErrors?.episode_number?.[0], `slug "${slug}"`).toMatch(/ese episodio ya existe/i)
+    }
+  })
+
+  it('editar un episodio sin cambiarle el número no choca consigo mismo', async () => {
+    const series = await insertSeries()
+    const ep = await insertEpisode(series.id, 1, 1)
+    await as(boss)
+    const { redirect } = await runAndCaptureRedirect(() => updateMovieAction(ep.id, episodeFields(series.id, { slug: ep.slug, title: 'Nuevo título', episode_number: '1' })))
+    expect(redirect).toBe('/dashboard/admin/movies')
+    expect((await adminClient().from('movies').select('title').eq('id', ep.id).single()).data!.title).toBe('Nuevo título')
   })
 
   it('con serie, temporada y episodio son obligatorios', async () => {

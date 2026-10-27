@@ -47,6 +47,7 @@ import androidx.media3.ui.PlayerView
 import com.mavros.archiver.core.android.player.PlaybackSession
 import com.mavros.archiver.core.android.player.PlayerUiState
 import com.mavros.archiver.core.android.player.PlayerViewModel
+import com.mavros.archiver.core.android.player.UpNext
 import com.mavros.archiver.core.design.MavrosLoader
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.tv.MavrosTvTheme
@@ -86,13 +87,16 @@ class TvPlayerActivity : ComponentActivity() {
         private const val TITLE = "title"
         private const val DURATION = "duration"
         private const val START_AT = "startAt"
+        private const val LIST_ID = "listId"
 
-        fun intent(context: Context, movie: Movie, startAtSeconds: Double): Intent =
+        /** Con [listId], al terminar ofrece lo siguiente de esa lista (PL-07) */
+        fun intent(context: Context, movie: Movie, startAtSeconds: Double, listId: String? = null): Intent =
             Intent(context, TvPlayerActivity::class.java)
                 .putExtra(MOVIE_ID, movie.id)
                 .putExtra(TITLE, movie.title)
                 .putExtra(DURATION, movie.durationSeconds)
                 .putExtra(START_AT, startAtSeconds)
+                .putExtra(LIST_ID, listId)
     }
 
     private lateinit var session: PlaybackSession
@@ -150,7 +154,10 @@ class TvPlayerActivity : ComponentActivity() {
             MavrosTvTheme {
                 val movie = current
                 // Una por película: al pasar al siguiente episodio se pide su propia URL (SER-16)
-                val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory { initializer { PlayerViewModel(container.playback, movie.id, container.catalog) } })
+                val listId = intent.getStringExtra(LIST_ID)
+                val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory {
+                    initializer { PlayerViewModel(container.playback, movie.id, container.catalog, container.playlists, listId) }
+                })
                 val state by vm.state.collectAsStateWithLifecycle()
                 val next by vm.next.collectAsStateWithLifecycle()
                 LaunchedEffect(state) {
@@ -262,14 +269,14 @@ class TvPlayerActivity : ComponentActivity() {
         return true
     }
 
-    /** Siguiente episodio sin salir del reproductor (SER-16) */
-    private fun playNext(next: Movie) {
+    /** Siguiente episodio o de la lista sin salir del reproductor (SER-16, PL-07) */
+    private fun playNext(next: UpNext) {
         ended = false
         nextCancelled = false
         controlsVisible = false
         selectedHeight = null
-        intent = intent(this, next, 0.0)
-        current = Current(next.id, next.title, next.durationSeconds, 0.0)
+        intent = intent(this, next.movie, next.startAt, intent.getStringExtra(LIST_ID))
+        current = Current(next.movie.id, next.movie.title, next.movie.durationSeconds, next.startAt)
     }
 
     private fun togglePlay() = if (player.isPlaying) player.pause() else player.play()

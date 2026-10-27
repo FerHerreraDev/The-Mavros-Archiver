@@ -27,7 +27,7 @@ const IdSchema = z.uuid()
  * Valida el formulario y verifica el video en R2 (MOV-07, MOV-08).
  * Devuelve los datos listos para guardar o el error a mostrar.
  */
-async function prepare(formData: FormData, supabase: SupabaseClient) {
+async function prepare(formData: FormData, supabase: SupabaseClient, currentId?: string) {
   const raw = Object.fromEntries(FIELDS.map((f) => [f, String(formData.get(f) ?? '')]))
   const parsed = movieFormSchema.safeParse(raw)
   if (!parsed.success) {
@@ -39,6 +39,11 @@ async function prepare(formData: FormData, supabase: SupabaseClient) {
   if (series_id !== null) {
     const { data: series } = await supabase.from('series').select('slug').eq('id', series_id).maybeSingle()
     if (!series) return { result: { error: 'Revisa los campos marcados.', fieldErrors: { series_id: ['La serie no existe'] } } }
+    // Antes que el slug: si el episodio ya existe, ese es el error que importa (SER-06)
+    let duplicate = supabase.from('movies').select('id').eq('series_id', series_id).eq('season_number', season_number!).eq('episode_number', episode_number!)
+    if (currentId) duplicate = duplicate.neq('id', currentId)
+    const { data: existing } = await duplicate
+    if (existing?.length) return { result: { error: 'Revisa los campos marcados.', fieldErrors: { episode_number: ['Ese episodio ya existe en la serie'] } } }
     if (raw.slug.trim() === '') parsed.data.slug = episodeSlug(series.slug, season_number!, episode_number!)
   }
 
@@ -96,7 +101,7 @@ export async function updateMovieAction(id: string, formData: FormData): Promise
   if (!session) return { error: DENIED }
   if (!IdSchema.safeParse(id).success) return { error: 'Película no encontrada.' }
 
-  const prepared = await prepare(formData, session.supabase)
+  const prepared = await prepare(formData, session.supabase, id)
   if (!prepared.data) return prepared.result
 
   const { data, error } = await session.supabase.from('movies').update(prepared.data).eq('id', id).select('id')

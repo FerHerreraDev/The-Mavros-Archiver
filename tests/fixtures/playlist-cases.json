@@ -1,0 +1,41 @@
+{
+  "_comment": "Casos compartidos web <-> Android (PL-05, PL-06). Los usan tests/unit/playlist.test.ts y PlaylistRulesTest.kt. Duración 1000 s.",
+  "movies": [
+    { "id": "m1", "season": 0, "episode": 0, "duration": 1000 },
+    { "id": "m2", "season": 0, "episode": 0, "duration": 1000 }
+  ],
+  "series": {
+    "s": [
+      { "id": "s1e1", "season": 1, "episode": 1, "duration": 1000 },
+      { "id": "s1e2", "season": 1, "episode": 2, "duration": 1000 },
+      { "id": "s2e1", "season": 2, "episode": 1, "duration": 1000 }
+    ],
+    "vacia": []
+  },
+  "_entries": "m = película, s = serie. El orden es el de la lista.",
+  "entries": ["m1", "s", "vacia", "m2"],
+  "start": [
+    { "name": "nada visto: la primera película desde 0", "progress": [], "expected": { "id": "m1", "startAt": 0 } },
+    {
+      "name": "la primera película a medias: desde donde se quedó",
+      "progress": [{ "movieId": "m1", "position": 300, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "m1", "startAt": 300 }
+    },
+    { "name": "lista que empieza con una serie: su episodio de SER-10", "entries": ["s", "m1"], "progress": [{ "movieId": "s1e1", "position": 990, "updatedAt": "2026-01-01T00:00:00Z" }], "expected": { "id": "s1e2", "startAt": 0 } },
+    { "name": "una serie sin episodios visibles se salta", "entries": ["vacia", "m2"], "progress": [], "expected": { "id": "m2", "startAt": 0 } },
+    { "name": "lista vacía", "entries": [], "progress": [], "expected": null }
+  ],
+  "next": [
+    { "name": "tras una película, la serie siguiente por su episodio de SER-10", "current": "m1", "progress": [], "expected": { "id": "s1e1", "startAt": 0 } },
+    { "name": "dentro de la serie, el siguiente episodio", "current": "s1e1", "progress": [], "expected": { "id": "s1e2", "startAt": 0 } },
+    { "name": "cruza temporada dentro de la serie", "current": "s1e2", "progress": [], "expected": { "id": "s2e1", "startAt": 0 } },
+    {
+      "name": "último episodio de la serie: salta la serie vacía y va a la siguiente película donde se quedó",
+      "current": "s2e1",
+      "progress": [{ "movieId": "m2", "position": 120, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "m2", "startAt": 120 }
+    },
+    { "name": "lo último de la lista: nada", "current": "m2", "progress": [], "expected": null },
+    { "name": "algo que no está en la lista: nada", "current": "otra", "progress": [], "expected": null }
+  ]
+}

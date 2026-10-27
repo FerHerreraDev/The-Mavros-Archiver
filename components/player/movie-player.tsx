@@ -19,8 +19,8 @@ type Props = {
   initialUrl: string
   initialExpiresAt: string
   startAt: number
-  /** Episodio siguiente (SER-12): al terminar se ofrece con cuenta regresiva */
-  next?: { slug: string; title: string; label: string } | null
+  /** Lo siguiente (episodio SER-12 o elemento de la lista PL-06): al terminar se ofrece con cuenta regresiva */
+  next?: { href: string; title: string; label: string; heading: string } | null
 }
 
 const NEXT_COUNTDOWN_SECONDS = 10
@@ -175,11 +175,11 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
   )
 }
 
-/** "Siguiente episodio en 10 s" con Ver ahora / Cancelar (SER-12) */
+/** "Siguiente episodio en 10 s" (o "Siguiente en la lista") con Ver ahora / Cancelar (SER-12, PL-06) */
 function NextEpisode({ next, onCancel }: { next: NonNullable<Props['next']>; onCancel: () => void }) {
   const router = useRouter()
   const [left, setLeft] = useState(NEXT_COUNTDOWN_SECONDS)
-  const href = `/dashboard/watch/${next.slug}`
+  const href = next.href
 
   useEffect(() => {
     if (left <= 0) {
@@ -193,14 +193,14 @@ function NextEpisode({ next, onCancel }: { next: NonNullable<Props['next']>; onC
   return (
     <div
       role="dialog"
-      aria-label="Siguiente episodio"
+      aria-label={next.heading}
       className="absolute bottom-16 right-4 z-10 w-72 space-y-3 rounded-2xl border border-border bg-black/85 p-4 backdrop-blur"
     >
       <div>
-        <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground">Siguiente episodio en {left} s</p>
-        <p className="mt-1 text-sm font-medium text-foreground line-clamp-2">
-          {next.label} · {next.title}
+        <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground">
+          {next.heading} en {left} s
         </p>
+        <p className="mt-1 text-sm font-medium text-foreground line-clamp-2">{next.label ? `${next.label} · ${next.title}` : next.title}</p>
       </div>
       <div className="flex gap-2">
         <button

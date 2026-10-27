@@ -435,3 +435,29 @@ Una serie agrupa episodios. Cada episodio es un video como una película (misma 
 |---|---|
 | SER-15 | Teléfono y tele muestran la sección/fila **Series** (SER-08) y "Seguir viendo" con episodios (SER-11). La pantalla de la serie tiene las temporadas, los episodios (SER-09) y el botón de SER-10. En la tele todo se recorre con el control remoto. |
 | SER-16 | En el reproductor de Android, al terminar un episodio con siguiente aparece "Siguiente episodio" con cuenta regresiva de 10 s, "Ver ahora" (enfocado en la tele) y "Cancelar"; al llegar a 0 o con "Ver ahora" reproduce el siguiente desde el principio sin salir del reproductor, con su propio progreso y token (MOB-15, MOB-16). |
+
+## Fase P — Listas personales (playlists)
+
+Cada usuario arma sus propias listas con películas y series, en el orden que quiera, y las puede reproducir de corrido. Son privadas: nadie más las ve, ni un admin. La regla de "qué sigue en la lista" es pura y tiene casos compartidos web ↔ Android (`tests/fixtures/playlist-cases.json`).
+
+### Base de datos (`playlists`, `playlist_items`)
+
+| ID | Requisito |
+|---|---|
+| PL-01 | Una lista tiene dueño (quien la crea), nombre de 1 a 100 caracteres (sin espacios sobrantes) y fechas. Cada usuario solo ve, crea, renombra y borra **sus** listas; no puede crearlas a nombre de otro. Un admin tampoco ve las ajenas. Un anónimo nada. |
+| PL-02 | Un elemento de la lista es **una** película/episodio **o** una serie (nunca ambos ni ninguno) con su posición. No se repite lo mismo en una lista. Solo el dueño de la lista lee y cambia sus elementos, y solo puede agregar lo que puede ver (publicado). Borrar la lista borra sus elementos; borrar una película o serie la quita de las listas. |
+
+### Web
+
+| ID | Requisito |
+|---|---|
+| PL-03 | **Mis listas** (`/dashboard/lists`, enlace en el menú): crear una lista con nombre, ver cada una con cuántos elementos tiene, renombrar y borrar (pide confirmación). Sin listas, un estado vacío que explica cómo agregar. |
+| PL-04 | En la página de una película/episodio y en la de una serie hay **Agregar a lista**: muestra mis listas marcando en cuáles ya está; tocar una agrega o quita; se puede crear una lista nueva ahí mismo y queda agregado. Lo nuevo va al final de la lista. |
+| PL-05 | La página de una lista (`/dashboard/lists/<id>`) muestra sus elementos en orden con póster y título (las series dicen "Serie"); se pueden quitar y mover arriba/abajo. **Reproducir lista** empieza por el primer elemento (una serie, por su episodio de SER-10). Una lista ajena o inexistente → 404. Los elementos que dejaron de estar publicados no aparecen. |
+| PL-06 | Al reproducir desde una lista, al terminar aparece **"Siguiente en la lista"** con cuenta regresiva de 10 s (como SER-12): si lo que terminó es un episodio de una serie de la lista y la serie tiene siguiente episodio, sigue la serie; si no, el siguiente elemento de la lista (una película, o el episodio de SER-10 de una serie). En el último no aparece. |
+
+### Android (teléfono y tele)
+
+| ID | Requisito |
+|---|---|
+| PL-07 | Teléfono y tele tienen **Mis listas**: ver mis listas y abrir una para ver sus elementos en orden; tocar uno abre su detalle (película) o su página (serie). **Reproducir lista** como en PL-05 y, al terminar cada elemento, "Siguiente en la lista" como PL-06 (mismas reglas, casos compartidos). En el detalle y en la página de una serie hay **Agregar a lista** con mis listas marcadas (agrega o quita). |

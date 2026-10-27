@@ -61,9 +61,9 @@ import com.mavros.archiver.mobile.ui.DetailSkeleton
 import com.mavros.archiver.mobile.ui.ErrorState
 
 @Composable
-fun SeriesScreen(viewModel: SeriesViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit) {
+fun SeriesScreen(viewModel: SeriesViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit, extra: @Composable () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    SeriesContent(state, onBack, onPlay, viewModel::selectSeason, viewModel::retry)
+    SeriesContent(state, onBack, onPlay, viewModel::selectSeason, viewModel::retry, extra)
 }
 
 /** Página de la serie (SER-09, SER-10, SER-15) */
@@ -75,6 +75,7 @@ fun SeriesContent(
     onPlay: (Movie, Double) -> Unit,
     onSelectSeason: (Int) -> Unit,
     onRetry: () -> Unit,
+    extra: @Composable () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -92,13 +93,13 @@ fun SeriesContent(
             SeriesUiState.NotAvailable -> Box(Modifier.fillMaxSize().padding(padding).testTag("not-available"), contentAlignment = Alignment.Center) {
                 Text("Esta serie no está disponible.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is SeriesUiState.Content -> SeriesBody(state.detail, state.season, Modifier.padding(padding), onPlay, onSelectSeason)
+            is SeriesUiState.Content -> SeriesBody(state.detail, state.season, Modifier.padding(padding), onPlay, onSelectSeason, extra)
         }
     }
 }
 
 @Composable
-private fun SeriesBody(detail: SeriesDetail, season: Int?, modifier: Modifier, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit) {
+private fun SeriesBody(detail: SeriesDetail, season: Int?, modifier: Modifier, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit, extra: @Composable () -> Unit) {
     val series = detail.series
     val shown = detail.episodes.filter { it.seasonNumber == season }
     LazyColumn(
@@ -144,6 +145,8 @@ private fun SeriesBody(detail: SeriesDetail, season: Int?, modifier: Modifier, o
                 }
             }
         }
+        // "Agregar a lista" (PL-07)
+        item { extra() }
         series.synopsis?.let { item { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("synopsis")) } }
 
         item { Text("Episodios", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp).semantics { heading() }) }

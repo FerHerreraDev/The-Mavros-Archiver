@@ -14,6 +14,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.pressKey
 import com.mavros.archiver.core.android.catalog.CatalogUiState
 import com.mavros.archiver.core.android.detail.DetailUiState
@@ -151,7 +153,7 @@ class TvScreensTest {
     @Test fun `SER-16 siguiente episodio - Ver ahora enfocado, OK lo reproduce`() {
         var played: String? = null
         var cancelled = 0
-        content { com.mavros.archiver.tv.player.TvNextEpisode(episodes[1], { played = it.id }, { cancelled++ }) }
+        content { com.mavros.archiver.tv.player.TvNextEpisode(com.mavros.archiver.core.android.player.UpNext(episodes[1], 0.0, inList = false), { played = it.movie.id }, { cancelled++ }) }
         compose.waitForIdle()
         compose.onNodeWithTag("tv-next-countdown").assertTextContains("Siguiente episodio en", substring = true)
         compose.onNodeWithText("T1:E2 · El gato").assertIsDisplayed()
@@ -163,5 +165,62 @@ class TvScreensTest {
     @Test fun `SER-12 detalle de un episodio muestra su serie`() {
         content { TvDetailScreen(DetailUiState.Content(MovieDetail(episodes[1], null, show)), onPlay = { _, _ -> }, onRetry = {}) }
         compose.onNodeWithTag("tv-series-line").assertTextContains("Breaking Bad · T1:E2")
+    }
+
+    // --- Listas (PL-07) ----------------------------------------------------------
+
+    @Test fun `PL-07 mis listas - la primera enfocada y OK la abre`() {
+        var opened: String? = null
+        val lists = listOf(com.mavros.archiver.core.model.PlaylistSummary(com.mavros.archiver.core.model.Playlist("l1", "Finde"), 2), com.mavros.archiver.core.model.PlaylistSummary(com.mavros.archiver.core.model.Playlist("l2", "Terror"), 0))
+        content { com.mavros.archiver.tv.lists.TvListsScreen(com.mavros.archiver.core.android.lists.ListsUiState.Content(lists), { opened = it }, {}) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-list-l1").assertIsFocused()
+        compose.onNodeWithText("2 elementos").assertIsDisplayed()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("l2", opened)
+    }
+
+    @Test fun `PL-07 una lista - Reproducir lista enfocado, abajo los elementos`() {
+        val detail = com.mavros.archiver.core.model.PlaylistDetail(
+            com.mavros.archiver.core.model.Playlist("l1", "Maratón"),
+            listOf(com.mavros.archiver.core.model.PlaylistItem("i1", 1, movie("m1", "Akira"), null), com.mavros.archiver.core.model.PlaylistItem("i2", 2, null, show)),
+            com.mavros.archiver.core.model.ListPick(movie("m1", "Akira"), 0.0),
+        )
+        var played: String? = null
+        var openedItem: String? = null
+        content {
+            com.mavros.archiver.tv.lists.TvPlaylistScreen(com.mavros.archiver.core.android.lists.PlaylistUiState.Content(detail), { played = it.start?.episode?.id }, { openedItem = it.id }, {})
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-play-list").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("m1", played)
+        compose.onNodeWithTag("tv-item-i2").assertTextContains("Serie", substring = true)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("i2", openedItem)
+    }
+
+    @Test fun `PL-07 agregar a lista en la tele - abre con mis listas marcadas y OK cambia`() {
+        val toggled = mutableListOf<String>()
+        val state = com.mavros.archiver.core.android.lists.AddToListState(
+            lists = listOf(
+                com.mavros.archiver.core.model.PlaylistMembership(com.mavros.archiver.core.model.Playlist("l1", "Finde"), true),
+                com.mavros.archiver.core.model.PlaylistMembership(com.mavros.archiver.core.model.Playlist("l2", "Terror"), false),
+            ),
+        )
+        content { com.mavros.archiver.tv.lists.TvAddToList(state, onOpen = {}, onToggle = { toggled += it }) }
+        // Con el control: enfocar el botón y OK
+        compose.onNodeWithTag("tv-add-to-list").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        // El diálogo es otra ventana (otra raíz): las teclas se mandan ahí
+        val first = compose.onNodeWithTag("tv-toggle-l1")
+        first.assertIsFocused()
+        compose.onNodeWithContentDescription("En la lista").assertIsDisplayed()
+        first.performKeyInput { pressKey(Key.DirectionDown) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-toggle-l2").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(listOf("l2"), toggled)
     }
 }

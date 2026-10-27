@@ -42,19 +42,19 @@ import com.mavros.archiver.tv.catalog.errorText
 
 /** TV-05: detalle con "Reproducir" / "Continuar desde" enfocado al abrir */
 @Composable
-fun TvDetailScreen(state: DetailUiState, onPlay: (Movie, Double) -> Unit, onRetry: () -> Unit) {
+fun TvDetailScreen(state: DetailUiState, onPlay: (Movie, Double) -> Unit, onRetry: () -> Unit, extra: @Composable () -> Unit = {}) {
     Box(Modifier.fillMaxSize().background(MavrosColors.Background)) {
         when (state) {
             DetailUiState.Loading -> MavrosLoader(Modifier.align(Alignment.Center).testTag("tv-loading"), size = 72.dp)
             is DetailUiState.Error -> Message(errorText(state.error), onRetry)
             DetailUiState.NotAvailable -> Message("Esta película no está disponible.", null)
-            is DetailUiState.Content -> Body(state.detail, onPlay)
+            is DetailUiState.Content -> Body(state.detail, onPlay, extra)
         }
     }
 }
 
 @Composable
-private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit) {
+private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit, extra: @Composable () -> Unit) {
     val movie = detail.movie
     val play = remember { FocusRequester() }
     LaunchedEffect(movie.id) { runCatching { play.requestFocus() } }
@@ -77,6 +77,8 @@ private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit) {
                 onClick = { onPlay(movie, ProgressRules.resumePosition(detail.positionSeconds, movie.durationSeconds)) },
                 modifier = Modifier.focusRequester(play).testTag("tv-play"),
             ) { Text(playLabel(detail), fontWeight = FontWeight.SemiBold) }
+            // "Agregar a lista" (PL-07)
+            extra()
             Spacer(Modifier.height(8.dp))
             movie.synopsis?.let { Text(it, color = MavrosColors.Foreground, maxLines = 8, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge) }
         }

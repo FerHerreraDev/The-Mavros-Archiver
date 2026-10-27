@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -54,14 +55,20 @@ import com.mavros.archiver.mobile.ui.CatalogSkeleton
 import com.mavros.archiver.mobile.ui.PosterCard
 
 @Composable
-fun CatalogScreen(viewModel: CatalogViewModel, onOpenMovie: (String) -> Unit, onOpenProfile: () -> Unit, onOpenSeries: (String) -> Unit = {}) {
+fun CatalogScreen(
+    viewModel: CatalogViewModel,
+    onOpenMovie: (String) -> Unit,
+    onOpenProfile: () -> Unit,
+    onOpenSeries: (String) -> Unit = {},
+    onOpenLists: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Al regresar a esta pantalla, "Seguir viendo" se actualiza
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose { }
     }
-    CatalogContent(state, onOpenMovie, onOpenProfile, viewModel::selectGenre, viewModel::retry, onOpenSeries)
+    CatalogContent(state, onOpenMovie, onOpenProfile, viewModel::selectGenre, viewModel::retry, onOpenSeries, onOpenLists)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,6 +80,7 @@ fun CatalogContent(
     onSelectGenre: (String?) -> Unit,
     onRetry: () -> Unit,
     onOpenSeries: (String) -> Unit = {},
+    onOpenLists: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -88,6 +96,7 @@ fun CatalogContent(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onOpenLists, modifier = Modifier.testTag("open-lists")) { Icon(Icons.AutoMirrored.Outlined.PlaylistPlay, contentDescription = "Mis listas") }
                     IconButton(onClick = onOpenProfile) { Icon(Icons.Outlined.AccountCircle, contentDescription = "Perfil") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),

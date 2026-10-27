@@ -48,7 +48,7 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.mavros.archiver.core.android.player.NEXT_EPISODE_COUNTDOWN_SECONDS
 import com.mavros.archiver.core.design.MavrosColors
-import com.mavros.archiver.core.model.Movie
+import com.mavros.archiver.core.android.player.UpNext
 import com.mavros.archiver.core.model.formatTimestamp
 import kotlinx.coroutines.delay
 
@@ -188,12 +188,12 @@ private fun QualityDialog(qualities: List<Pair<Int?, String>>, selected: Int?, o
     }
 }
 
-/** "Siguiente episodio en 10 s" con "Ver ahora" enfocado y "Cancelar" (SER-16) */
+/** "Siguiente episodio en 10 s" (o "Siguiente en la lista") con "Ver ahora" enfocado y "Cancelar" (SER-16, PL-07) */
 @Composable
-fun TvNextEpisode(next: Movie, onPlay: (Movie) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
-    var left by remember(next.id) { mutableIntStateOf(NEXT_EPISODE_COUNTDOWN_SECONDS) }
+fun TvNextEpisode(next: UpNext, onPlay: (UpNext) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    var left by remember(next.movie.id) { mutableIntStateOf(NEXT_EPISODE_COUNTDOWN_SECONDS) }
     val now = remember { FocusRequester() }
-    LaunchedEffect(next.id) {
+    LaunchedEffect(next.movie.id) {
         runCatching { now.requestFocus() }
         while (left > 0) {
             delay(1_000)
@@ -210,8 +210,8 @@ fun TvNextEpisode(next: Movie, onPlay: (Movie) -> Unit, onCancel: () -> Unit, mo
             .testTag("tv-next-episode"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Siguiente episodio en $left s", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("tv-next-countdown"))
-        Text("${next.episodeTag} · ${next.title}", color = MavrosColors.Foreground, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+        Text("${next.heading} en $left s", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("tv-next-countdown"))
+        Text(next.movie.episodeTag?.let { "$it · ${next.movie.title}" } ?: next.movie.title, color = MavrosColors.Foreground, style = MaterialTheme.typography.titleLarge, maxLines = 2)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { onPlay(next) }, modifier = Modifier.focusRequester(now).testTag("tv-next-now")) { Text("Ver ahora") }
             OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("tv-next-cancel")) { Text("Cancelar") }

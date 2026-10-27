@@ -37,6 +37,13 @@ import com.mavros.archiver.tv.login.TvLoginScreen
 import com.mavros.archiver.tv.login.TvLoginViewModel
 import com.mavros.archiver.tv.player.TvPlayerActivity
 import com.mavros.archiver.tv.series.TvSeriesScreen
+import com.mavros.archiver.tv.lists.TvAddToList
+import com.mavros.archiver.tv.lists.TvListsScreen
+import com.mavros.archiver.tv.lists.TvPlaylistScreen
+import com.mavros.archiver.core.android.lists.AddToListViewModel
+import com.mavros.archiver.core.android.lists.ListsViewModel
+import com.mavros.archiver.core.android.lists.PlaylistViewModel
+import com.mavros.archiver.core.model.PlaylistTarget
 import com.mavros.archiver.core.android.series.SeriesViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -44,6 +51,8 @@ import kotlinx.serialization.Serializable
 @Serializable private data object CatalogRoute
 @Serializable private data class DetailRoute(val movieId: String)
 @Serializable private data class SeriesRoute(val seriesId: String)
+@Serializable private data object ListsRoute
+@Serializable private data class PlaylistRoute(val playlistId: String)
 
 class TvActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,6 +115,7 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
                 state = state,
                 onOpenMovie = { nav.navigate(DetailRoute(it)) },
                 onOpenSeries = { nav.navigate(SeriesRoute(it)) },
+                onOpenLists = { nav.navigate(ListsRoute) },
                 onSignOut = { container.appScope.launch { container.auth.signOut() } },
                 onRetry = vm::retry,
             )
@@ -114,13 +124,52 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
             val movieId = entry.toRoute<DetailRoute>().movieId
             val vm: DetailViewModel = viewModel(key = movieId, factory = viewModelFactory { initializer { DetailViewModel(container.catalog, movieId, container.progress) } })
             val state by vm.state.collectAsStateWithLifecycle()
-            TvDetailScreen(state, onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) }, onRetry = vm::retry)
+            TvDetailScreen(
+                state,
+                onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) },
+                onRetry = vm::retry,
+                extra = { AddToList(container, PlaylistTarget.MovieTarget(movieId)) },
+            )
         }
         composable<SeriesRoute> { entry ->
             val seriesId = entry.toRoute<SeriesRoute>().seriesId
             val vm: SeriesViewModel = viewModel(key = seriesId, factory = viewModelFactory { initializer { SeriesViewModel(container.catalog, seriesId, container.progress) } })
             val state by vm.state.collectAsStateWithLifecycle()
-            TvSeriesScreen(state, onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) }, onSelectSeason = vm::selectSeason, onRetry = vm::retry)
+            TvSeriesScreen(
+                state,
+                onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) },
+                onSelectSeason = vm::selectSeason,
+                onRetry = vm::retry,
+                extra = { AddToList(container, PlaylistTarget.SeriesTarget(seriesId)) },
+            )
+        }
+        composable<ListsRoute> {
+            val vm: ListsViewModel = viewModel(key = "lists-$userId", factory = viewModelFactory { initializer { ListsViewModel(container.playlists) } })
+            val state by vm.state.collectAsStateWithLifecycle()
+            LifecycleResumeEffect(Unit) {
+                vm.refresh()
+                onPauseOrDispose { }
+            }
+            TvListsScreen(state, onOpen = { nav.navigate(PlaylistRoute(it)) }, onRetry = vm::retry)
+        }
+        composable<PlaylistRoute> { entry ->
+            val playlistId = entry.toRoute<PlaylistRoute>().playlistId
+            val vm: PlaylistViewModel = viewModel(key = playlistId, factory = viewModelFactory { initializer { PlaylistViewModel(container.playlists, playlistId, container.progress) } })
+            val state by vm.state.collectAsStateWithLifecycle()
+            TvPlaylistScreen(
+                state,
+                onPlay = { detail -> detail.start?.let { context.startActivity(TvPlayerActivity.intent(context, it.episode, it.startAt, detail.playlist.id)) } },
+                onOpenItem = { item -> item.movie?.let { nav.navigate(DetailRoute(it.id)) } ?: item.series?.let { nav.navigate(SeriesRoute(it.id)) } },
+                onRetry = vm::retry,
+            )
         }
     }
+}
+
+/** "Agregar a lista" con su ViewModel (uno por película/serie) */
+@Composable
+private fun AddToList(container: MavrosContainer, target: PlaylistTarget) {
+    val vm: AddToListViewModel = viewModel(key = "add-$target", factory = viewModelFactory { initializer { AddToListViewModel(container.playlists, target) } })
+    val state by vm.state.collectAsStateWithLifecycle()
+    TvAddToList(state, onOpen = vm::load, onToggle = vm::toggle)
 }

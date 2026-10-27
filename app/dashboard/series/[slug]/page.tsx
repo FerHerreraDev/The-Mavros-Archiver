@@ -9,6 +9,8 @@ import type { CatalogEpisode } from '@/lib/data/catalog'
 import { PosterImage } from '@/components/catalog/poster-image'
 import { seriesCount } from '@/components/catalog/movie-card'
 import { cn } from '@/lib/utils'
+import { playlistMembership } from '@/lib/data/playlists'
+import { AddToList } from '@/components/lists/add-to-list'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const page = await getSeriesPage((await params).slug)
@@ -43,6 +45,7 @@ export default async function SeriesPage({
   if (!page) notFound()
 
   const { series, episodes, progress, next } = page
+  const lists = await playlistMembership({ seriesId: series.id })
   const seasons = [...new Set(episodes.map((e) => e.season))]
   const requested = Number(temporada)
   const season = seasons.includes(requested) ? requested : (next?.episode.season ?? seasons[0])
@@ -60,27 +63,30 @@ export default async function SeriesPage({
         </div>
         <div className="max-w-3xl space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{series.title}</h1>
-            {series.status === 'draft' && (
-              <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
-                Borrador · vista previa
-              </span>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{series.title}</h1>
+              {series.status === 'draft' && (
+                <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
+                  Borrador · vista previa
+                </span>
+              )}
+            </div>
+            {series.original_title && <p className="text-sm text-muted-foreground">{series.original_title}</p>}
+            <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground">
+              {[series.release_year, seriesCount(seasons.length, episodes.length), ...series.genres].filter(Boolean).join(' · ')}
+            </p>
+            {series.synopsis && <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{series.synopsis}</p>}
+            <div className="flex flex-wrap items-center gap-3">
+            {next && (
+              <Link
+                href={`/dashboard/watch/${next.episode.slug}`}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                {nextUpLabel(next)}
+              </Link>
             )}
+            <AddToList target={{ seriesId: series.id }} lists={lists} />
           </div>
-          {series.original_title && <p className="text-sm text-muted-foreground">{series.original_title}</p>}
-          <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground">
-            {[series.release_year, seriesCount(seasons.length, episodes.length), ...series.genres].filter(Boolean).join(' · ')}
-          </p>
-          {series.synopsis && <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{series.synopsis}</p>}
-          {next && (
-            <Link
-              href={`/dashboard/watch/${next.episode.slug}`}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Play className="h-4 w-4 fill-current" />
-              {nextUpLabel(next)}
-            </Link>
-          )}
         </div>
       </section>
 

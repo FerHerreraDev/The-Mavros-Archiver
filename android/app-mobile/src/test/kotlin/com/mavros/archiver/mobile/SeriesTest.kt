@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performScrollToNode
 import com.mavros.archiver.core.android.catalog.CatalogUiState
 import com.mavros.archiver.core.android.player.PlayerUiState
 import com.mavros.archiver.core.android.player.PlayerViewModel
+import com.mavros.archiver.core.android.player.UpNext
 import com.mavros.archiver.core.android.series.SeriesUiState
 import com.mavros.archiver.core.android.series.SeriesViewModel
 import com.mavros.archiver.core.data.DataResult
@@ -114,7 +115,7 @@ class SeriesScreensTest {
     @Test fun `SER-16 siguiente episodio - Ver ahora y Cancelar`() {
         var played: Movie? = null
         var cancelled = 0
-        content { NextEpisodeCard(s1e2, { played = it }, { cancelled++ }) }
+        content { NextEpisodeCard(UpNext(s1e2, 0.0, inList = false), { played = it.movie }, { cancelled++ }) }
         compose.onNodeWithTag("next-countdown").assertTextContains("Siguiente episodio en 10 s")
         compose.onNodeWithText("T1:E2 · El gato").assertIsDisplayed()
         compose.onNodeWithTag("next-cancel").performClick()
@@ -126,7 +127,7 @@ class SeriesScreensTest {
     @Test fun `SER-16 siguiente episodio - a los 10 s se reproduce solo`() {
         var played: Movie? = null
         compose.mainClock.autoAdvance = false
-        content { NextEpisodeCard(s1e2, { played = it }, {}) }
+        content { NextEpisodeCard(UpNext(s1e2, 0.0, inList = false), { played = it.movie }, {}) }
         // El conteo arranca en el primer cuadro (~16 ms)
         compose.mainClock.advanceTimeBy(5_100)
         compose.onNodeWithTag("next-countdown").assertTextContains("Siguiente episodio en 5 s")
@@ -164,7 +165,7 @@ class SeriesViewModelsTest {
         val vm = PlayerViewModel(FakePlaybackRepository(), "e1", repo)
         assertIs<PlayerUiState.Ready>(vm.state.value)
         assertEquals(listOf("e1"), repo.nextRequests)
-        assertEquals("e2", vm.next.value?.id)
+        assertEquals("e2", vm.next.value?.movie?.id)
         // Sin catálogo (o película) no hay siguiente
         assertNull(PlayerViewModel(FakePlaybackRepository(), "m").next.value)
     }

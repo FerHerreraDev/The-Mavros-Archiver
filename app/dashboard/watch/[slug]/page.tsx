@@ -6,6 +6,9 @@ import { playbackUrl } from '@/lib/video/playback'
 import { resumePosition } from '@/lib/progress'
 import { formatDuration } from '@/lib/movies'
 import { episodeLabel } from '@/lib/series'
+import { nextFromPlaylist, playlistMembership } from '@/lib/data/playlists'
+import type { CatalogEpisode } from '@/lib/data/catalog'
+import { AddToList } from '@/components/lists/add-to-list'
 import { MoviePlayer } from '@/components/player/movie-player'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -13,16 +16,27 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: watchable ? `${watchable.movie.title} - The Mavros Archiver` : 'The Mavros Archiver' }
 }
 
-export default async function WatchPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
+export default async function WatchPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ lista?: string }>
+}) {
+  const [{ slug }, { lista }] = await Promise.all([params, searchParams])
   // RLS: publicada para cualquiera, borrador solo para admins; si no, 404 (WATCH-01)
   const watchable = await getWatchable(slug)
   if (!watchable) notFound()
 
   const { movie, positionSeconds, episode } = watchable
-  const next = episode?.next
-    ? { slug: episode.next.slug, title: episode.next.title, label: episodeLabel(episode.next.season, episode.next.episode) }
-    : null
+  const [fromList, lists] = await Promise.all([lista ? nextFromPlaylist(lista, movie.id) : null, playlistMembership({ movieId: movie.id })])
+  const label = (e: CatalogEpisode) => (e.series_id ? episodeLabel(e.season, e.episode) : '')
+  // Desde una lista manda la lista (PL-06); si no, el siguiente episodio de la serie (SER-12)
+  const next = fromList
+    ? { href: `/dashboard/watch/${fromList.next.slug}?lista=${fromList.playlist.id}`, title: fromList.next.title, label: label(fromList.next), heading: 'Siguiente en la lista' }
+    : !lista && episode?.next
+      ? { href: `/dashboard/watch/${episode.next.slug}`, title: episode.next.title, label: label(episode.next), heading: 'Siguiente episodio' }
+      : null
   const { url, expiresAt } = await playbackUrl(movie.hls_path)
 
   return (
@@ -69,6 +83,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
           {[movie.release_year, formatDuration(movie.duration_seconds), ...movie.genres].filter(Boolean).join(' · ')}
         </p>
         {movie.synopsis && <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{movie.synopsis}</p>}
+        <AddToList target={{ movieId: movie.id }} lists={lists} />
       </section>
     </div>
   )

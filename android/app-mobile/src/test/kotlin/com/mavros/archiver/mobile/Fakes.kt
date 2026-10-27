@@ -13,6 +13,14 @@ import com.mavros.archiver.core.model.ContinueItem
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.MovieDetail
 import com.mavros.archiver.core.model.Series
+import com.mavros.archiver.core.model.ListPick
+import com.mavros.archiver.core.model.Playlist
+import com.mavros.archiver.core.model.PlaylistDetail
+import com.mavros.archiver.core.model.PlaylistMembership
+import com.mavros.archiver.core.model.PlaylistSummary
+import com.mavros.archiver.core.model.PlaylistTarget
+import com.mavros.archiver.core.data.PlaylistRepository
+import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.model.SeriesDetail
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +124,44 @@ class FakeContainer(
         override suspend fun requestCode(clientName: String) = DataResult.Failure(com.mavros.archiver.core.data.DataError.Server)
         override suspend fun poll(deviceCode: String) = DataResult.Failure(com.mavros.archiver.core.data.DataError.Server)
     },
+    override val playlists: FakePlaylistRepository = FakePlaylistRepository(),
 ) : AppContainer {
     override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+}
+
+class FakePlaylistRepository : PlaylistRepository {
+    val lists = mutableListOf(Playlist("l1", "Para el finde"), Playlist("l2", "Clásicos"))
+    /** Qué hay en cada lista: ids de película o serie */
+    val contents = mutableMapOf("l1" to mutableListOf<String>(), "l2" to mutableListOf())
+    var detailResult: DataResult<PlaylistDetail?> = DataResult.Success(null)
+    var nextResult: DataResult<ListPick?> = DataResult.Success(null)
+    var failToggle = false
+    val toggles = mutableListOf<Pair<String, PlaylistTarget>>()
+    val nextRequests = mutableListOf<Pair<String, String>>()
+    /** Para probar el doble toque: el toggle espera hasta que se complete */
+    var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
+    private fun PlaylistTarget.key() = when (this) {
+        is PlaylistTarget.MovieTarget -> movieId
+        is PlaylistTarget.SeriesTarget -> seriesId
+    }
+
+    override suspend fun lists() = DataResult.Success(lists.map { PlaylistSummary(it, contents[it.id]!!.size) })
+    override suspend fun playlist(id: String) = detailResult
+    override suspend fun membership(target: PlaylistTarget) = DataResult.Success(lists.map { PlaylistMembership(it, target.key() in contents[it.id]!!) })
+    override suspend fun toggle(playlistId: String, target: PlaylistTarget): DataResult<Boolean> {
+        toggles += playlistId to target
+        gate?.await()
+        if (failToggle) return DataResult.Failure(DataError.Network)
+        val list = contents.getValue(playlistId)
+        return DataResult.Success(if (list.remove(target.key())) false else list.add(target.key()))
+    }
+    override suspend fun create(name: String, add: PlaylistTarget?): DataResult<String> {
+        val id = "l${lists.size + 1}"
+        lists += Playlist(id, name.trim())
+        contents[id] = mutableListOf()
+        add?.let { contents.getValue(id).add(it.key()) }
+        return DataResult.Success(id)
+    }
+    override suspend fun next(playlistId: String, movieId: String): DataResult<ListPick?> { nextRequests += playlistId to movieId; return nextResult }
 }

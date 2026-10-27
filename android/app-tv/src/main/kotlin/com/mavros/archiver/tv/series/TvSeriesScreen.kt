@@ -51,20 +51,20 @@ import com.mavros.archiver.tv.catalog.errorText
 
 /** SER-15: página de la serie en la tele, con el botón de "qué sigue" enfocado al abrir */
 @Composable
-fun TvSeriesScreen(state: SeriesUiState, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit, onRetry: () -> Unit) {
+fun TvSeriesScreen(state: SeriesUiState, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit, onRetry: () -> Unit, extra: @Composable () -> Unit = {}) {
     Box(Modifier.fillMaxSize().background(MavrosColors.Background)) {
         when (state) {
             SeriesUiState.Loading -> MavrosLoader(Modifier.align(Alignment.Center).testTag("tv-loading"), size = 72.dp)
             is SeriesUiState.Error -> Message(errorText(state.error), onRetry)
             SeriesUiState.NotAvailable -> Message("Esta serie no está disponible.", null)
-            is SeriesUiState.Content -> Body(state.detail, state.season, onPlay, onSelectSeason)
+            is SeriesUiState.Content -> Body(state.detail, state.season, onPlay, onSelectSeason, extra)
         }
     }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit) {
+private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit, extra: @Composable () -> Unit) {
     val series = detail.series
     val play = remember { FocusRequester() }
     // El botón vive en una LazyColumn: se crea después de esta composición, se reintenta cuadro a cuadro
@@ -94,10 +94,14 @@ private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> 
                         style = MonoLabel,
                         color = MavrosColors.MutedForeground,
                     )
-                    detail.next?.let { next ->
-                        Button(onClick = { onPlay(next.episode, next.startAt) }, modifier = Modifier.focusRequester(play).testTag("tv-play")) {
-                            Text(next.label, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        detail.next?.let { next ->
+                            Button(onClick = { onPlay(next.episode, next.startAt) }, modifier = Modifier.focusRequester(play).testTag("tv-play")) {
+                                Text(next.label, fontWeight = FontWeight.SemiBold)
+                            }
                         }
+                        // "Agregar a lista" (PL-07)
+                        extra()
                     }
                     series.synopsis?.let { Text(it, color = MavrosColors.Foreground, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge) }
                 }
