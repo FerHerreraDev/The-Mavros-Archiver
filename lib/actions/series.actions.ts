@@ -5,13 +5,13 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/guards'
 import { seriesFormSchema } from '@/lib/movies'
-import { processPoster, uploadPoster } from '@/lib/poster/thumbhash'
+import { BACKDROP_MAX_WIDTH, processPoster, uploadPoster } from '@/lib/poster/thumbhash'
 import type { MovieActionResult } from '@/lib/actions/movie.actions'
 
 const SERIES_PATH = '/dashboard/admin/series'
 const DENIED = 'Acceso denegado. Se requieren privilegios de administrador.'
 const NOT_FOUND = 'Serie no encontrada.'
-const FIELDS = ['title', 'slug', 'original_title', 'synopsis', 'release_year', 'genres', 'poster_url'] as const
+const FIELDS = ['title', 'slug', 'original_title', 'synopsis', 'release_year', 'genres', 'poster_url', 'backdrop_url'] as const
 const IdSchema = z.uuid()
 
 function dbError(error: { code?: string; message: string }): MovieActionResult {
@@ -29,9 +29,17 @@ async function prepare(formData: FormData, supabase: Parameters<typeof uploadPos
   if (!parsed.success) {
     return { result: { error: 'Revisa los campos marcados.', fieldErrors: z.flattenError(parsed.error).fieldErrors } }
   }
-  const poster = await processPoster(parsed.data.poster_url)
-  const poster_image_url = poster.image ? await uploadPoster(supabase, poster.image) : null
-  return { data: { ...parsed.data, poster_thumbhash: poster.thumbhash, poster_image_url } }
+  const [poster, backdrop] = await Promise.all([
+    processPoster(parsed.data.poster_url),
+    processPoster(parsed.data.backdrop_url, undefined, BACKDROP_MAX_WIDTH),
+  ])
+  const [poster_image_url, backdrop_image_url] = await Promise.all([
+    poster.image ? uploadPoster(supabase, poster.image) : null,
+    backdrop.image ? uploadPoster(supabase, backdrop.image) : null,
+  ])
+  return {
+    data: { ...parsed.data, poster_thumbhash: poster.thumbhash, poster_image_url, backdrop_thumbhash: backdrop.thumbhash, backdrop_image_url },
+  }
 }
 
 export async function createSeriesAction(formData: FormData): Promise<MovieActionResult> {

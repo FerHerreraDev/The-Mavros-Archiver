@@ -13,7 +13,7 @@ export type CatalogSeries = Pick<
   'id' | 'slug' | 'title' | 'release_year' | 'genres' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash' | 'published_at'
 > & { seasons: number; episodes: number }
 /** Episodio con lo que necesitan las reglas de series (SER-10..SER-13) */
-export type CatalogEpisode = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status'> & {
+export type CatalogEpisode = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status' | 'synopsis' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash'> & {
   series_id: string
   season: number
   episode: number
@@ -29,9 +29,9 @@ export type ContinueItem = {
 
 const CARD_FIELDS = 'id, slug, title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
 const SERIES_FIELDS = 'id, slug, title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
-const EPISODE_FIELDS = 'id, slug, title, duration_seconds, status, series_id, season_number, episode_number'
+const EPISODE_FIELDS = 'id, slug, title, duration_seconds, status, series_id, season_number, episode_number, synopsis, poster_url, poster_image_url, poster_thumbhash'
 
-type EpisodeRow = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status'> & {
+type EpisodeRow = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status' | 'synopsis' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash'> & {
   series_id: string
   season_number: number
   episode_number: number
@@ -42,6 +42,10 @@ const toEpisode = (e: EpisodeRow): CatalogEpisode => ({
   title: e.title,
   duration_seconds: e.duration_seconds,
   status: e.status,
+  synopsis: e.synopsis,
+  poster_url: e.poster_url,
+  poster_image_url: e.poster_image_url,
+  poster_thumbhash: e.poster_thumbhash,
   series_id: e.series_id,
   season: e.season_number,
   episode: e.episode_number,

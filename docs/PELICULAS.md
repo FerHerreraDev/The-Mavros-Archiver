@@ -41,6 +41,20 @@ Entrada/Breaking.Bad.S01E04.720p.BluRay.mkv           ← "720p.BluRay…" no se
   serie están publicados.
 - Un episodio que ya existe va a `Errores` sin subir nada.
 
+### Datos automáticos con TMDB
+
+Con `TMDB_API_KEY` en `.env.local` (y en Vercel), la carpeta y el panel llenan solos lo que falte:
+
+- **Película nueva:** sinopsis, título original, año, géneros y póster.
+- **Serie nueva:** lo mismo más la imagen horizontal de su página.
+- **Cada episodio:** título real, sinopsis e imagen. Si TMDB no tiene imagen, se usa un cuadro del propio video.
+- Nunca pisa lo que ya escribiste y el título de la película o serie no cambia. Si TMDB no encuentra
+  nada o no responde, todo se crea igual que antes.
+- En el panel: **Buscar en TMDB** al editar una película o serie (para elegir el resultado correcto si
+  la búsqueda automática se equivocó) y **Completar episodios desde TMDB** en la serie.
+
+La clave se saca gratis en themoviedb.org → Ajustes → API (sirve la "API key" o el "Read Access Token").
+
 ## A mano (paso por paso)
 
 Tres pasos en tu Mac: convertir a HLS, subir a R2 y darla de alta en el panel.

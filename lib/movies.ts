@@ -17,7 +17,9 @@ export type Movie = {
   /** Copia optimizada en el bucket `posters` (LOAD-07); si no hay, se usa poster_url */
   poster_image_url: string | null
   hls_path: string
-  /** Episodio de una serie (SER-03): los tres juntos o null */
+  /** Película o serie en TMDB (TMDB-02) */
+  tmdb_id: number | null
+  /** Episodio de una serie (SER-03): los tres juntos o null. En un episodio el póster es su imagen 16:9 (SER-19) */
   series_id: string | null
   season_number: number | null
   episode_number: number | null
@@ -57,7 +59,12 @@ const optionalText = (max: number, label: string) =>
     .max(max, `${label}: máximo ${max} caracteres`)
     .transform((v) => (v === '' ? null : v))
 
-export type Series = Omit<Movie, 'duration_seconds' | 'hls_path' | 'series_id' | 'season_number' | 'episode_number'>
+export type Series = Omit<Movie, 'duration_seconds' | 'hls_path' | 'series_id' | 'season_number' | 'episode_number'> & {
+  /** Imagen horizontal de fondo de su página (SER-17) */
+  backdrop_url: string | null
+  backdrop_image_url: string | null
+  backdrop_thumbhash: string | null
+}
 
 const optionalInt = (min: number, max: number, message: string) =>
   z
@@ -105,8 +112,13 @@ const catalogFields = {
   poster_url: optionalText(500, 'Póster').refine((v) => v === null || /^https:\/\/\S+$/.test(v), 'El póster debe ser una URL https://'),
 }
 
-/** Formulario de serie (SER-05): lo mismo que una película sin video */
-export const seriesFormSchema = z.object(catalogFields).transform(withSlug)
+/** Formulario de serie (SER-05): lo mismo que una película sin video, más la imagen horizontal (SER-19) */
+export const seriesFormSchema = z
+  .object({
+    ...catalogFields,
+    backdrop_url: optionalText(500, 'Imagen horizontal').refine((v) => v === null || /^https:\/\/\S+$/.test(v), 'La imagen debe ser una URL https://'),
+  })
+  .transform(withSlug)
 export type SeriesFormData = z.output<typeof seriesFormSchema>
 
 /**

@@ -5,7 +5,8 @@
 // (scripts/install-movie-inbox.sh) o a mano con `pnpm movie:inbox`.
 //
 // Solo lee de ../.env.local NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY (para crear el
-// borrador). Las llaves de R2 viven en la config de rclone.
+// borrador) y TMDB_API_KEY (opcional: datos automáticos, TMDB-04). Las llaves de R2 viven en la
+// config de rclone.
 // Pruebas: MAVROS_INBOX, MAVROS_ENV_FILE y R2_REMOTE apuntan a carpetas y Supabase locales.
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -13,6 +14,8 @@ import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { parseMaster, parseMedia, mediaDuration } from '../lib/hls/playlist.mjs'
+import { createTmdb } from '../lib/tmdb/client.mjs'
+import { enrichEpisode, enrichMovie, seriesFieldsFromTmdb } from './movie-inbox-tmdb.mjs'
 import { encodeFraction, episodeSlug, isStable, isVideo, parseEpisode, parseFileName, parseRcloneStats, remainingMs, statusFileName, uniqueSlug } from './movie-inbox-lib.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
@@ -32,14 +35,17 @@ function notify(title, message) {
   }
 }
 
-function supabaseAdmin() {
-  const env = Object.fromEntries(
+function readEnv() {
+  return Object.fromEntries(
     readFileSync(process.env.MAVROS_ENV_FILE ?? path.join(ROOT, '.env.local'), 'utf8')
       .split('\n')
-      .map((l) => l.match(/^\s*(NEXT_PUBLIC_SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)\s*=\s*"?([^"\n]*)"?\s*$/))
+      .map((l) => l.match(/^\s*(NEXT_PUBLIC_SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|TMDB_API_KEY)\s*=\s*"?([^"\n]*)"?\s*$/))
       .filter(Boolean)
       .map((m) => [m[1], m[2]]),
   )
+}
+
+function supabaseAdmin(env) {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Faltan NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY en .env.local')
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 }
@@ -142,7 +148,7 @@ async function plan(db, file) {
 
   const { series, season, episode: number, title } = episode
   if (!series.slug) throw new Error('No se pudo sacar un slug del nombre de la serie')
-  const { data: found, error } = await db.from('series').select('id, slug, title').eq('slug', series.slug).maybeSingle()
+  const { data: found, error } = await db.from('series').select('id, slug, title, tmdb_id').eq('slug', series.slug).maybeSingle()
   if (error) throw new Error(`No se pudo leer la base: ${error.message}`)
   if (found) {
     const { data: dup } = await db.from('movies').select('id').eq('series_id', found.id).eq('season_number', season).eq('episode_number', number)
@@ -163,15 +169,16 @@ async function plan(db, file) {
   }
 }
 
-/** La serie existente o una nueva en borrador (SER-14) */
-async function seriesId(db, series) {
-  if (series.id) return series.id
-  const { data, error } = await db.from('series').insert({ ...series, status: 'draft' }).select('id').single()
+/** La serie existente o una nueva en borrador, ya con datos de TMDB si hay (SER-14, TMDB-04) */
+async function ensureSeries(db, tmdb, series) {
+  if (series.id) return series
+  const fromTmdb = await seriesFieldsFromTmdb(db, tmdb, { title: series.title, year: series.release_year })
+  const { data, error } = await db.from('series').insert({ ...fromTmdb, ...series, release_year: fromTmdb.release_year ?? series.release_year, status: 'draft' }).select('id, tmdb_id').single()
   if (error) throw new Error(`Se subió el video pero no se pudo crear la serie: ${error.message}`)
-  return data.id
+  return data
 }
 
-async function processFile(db, file) {
+async function processFile(db, tmdb, file) {
   const source = path.join(DIRS.inbox, file)
   const target = await plan(db, file)
   const { slug } = target
@@ -208,17 +215,31 @@ async function processFile(db, file) {
       progress.update('subiendo', stats.fraction, remainingMs(stats.fraction, Date.now() - upStarted))
     })
 
-    const { error: insertError } = await db.from('movies').insert({
-      ...target.row,
-      ...(target.series ? { series_id: await seriesId(db, target.series) } : {}),
-      slug,
-      duration_seconds: durationSeconds(out),
-      hls_path: `${target.r2}/master.m3u8`,
-      genres: [],
-      status: 'draft',
-    })
+    const series = target.series ? await ensureSeries(db, tmdb, target.series) : null
+    const duration = durationSeconds(out)
+    const { data: created, error: insertError } = await db
+      .from('movies')
+      .insert({
+        ...target.row,
+        ...(series ? { series_id: series.id } : {}),
+        slug,
+        duration_seconds: duration,
+        hls_path: `${target.r2}/master.m3u8`,
+        genres: [],
+        status: 'draft',
+      })
+      .select('id')
+      .single()
     if (insertError) throw new Error(`Se subió el video pero no se pudo crear el borrador: ${insertError.message}`)
-    return { slug, label: target.label, isEpisode: Boolean(target.series) }
+
+    // Datos automáticos (TMDB-04): nunca hacen fallar lo ya subido
+    progress.update('buscando datos', 1, null)
+    if (series) {
+      await enrichEpisode(db, tmdb, created.id, { seriesTmdbId: series.tmdb_id, season: target.row.season_number, episode: target.row.episode_number, source, duration })
+    } else {
+      await enrichMovie(db, tmdb, created.id, { title: target.title, year: target.row.release_year })
+    }
+    return { slug, label: target.label, isEpisode: Boolean(series) }
   } finally {
     progress.clear()
     rmSync(work, { recursive: true, force: true })
@@ -252,10 +273,14 @@ async function main() {
     writeFileSync(STATE, JSON.stringify(seen))
     if (ready.length === 0) return
 
-    const db = supabaseAdmin()
+    const env = readEnv()
+    const db = supabaseAdmin(env)
+    // Las variables del proceso permiten apuntar a un TMDB falso en las pruebas
+    const tmdb = createTmdb({ ...env, ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TMDB_'))) })
+    if (!tmdb) log('Sin TMDB_API_KEY: los borradores se crean sin datos automáticos')
     for (const file of ready) {
       try {
-        const { slug, label, isEpisode } = await processFile(db, file)
+        const { slug, label, isEpisode } = await processFile(db, tmdb, file)
         moveTo(DIRS.done, file)
         log(`${file}: listo como borrador (${slug})`)
         notify(

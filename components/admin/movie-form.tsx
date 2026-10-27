@@ -21,7 +21,7 @@ const SELECT =
 
 type Props = {
   action: (formData: FormData) => Promise<MovieActionResult>
-  movie?: Partial<Movie>
+  movie?: Partial<Movie> & { backdrop_url?: string | null }
   submitLabel: string
   /** false = formulario de serie: sin video (SER-05) */
   video?: boolean
@@ -152,9 +152,17 @@ export function MovieForm({ action, movie, submitLabel, video = true, seriesOpti
         )}
         {field(
           'poster_url',
-          'Póster (URL)',
+          // En un episodio el "póster" es su imagen 16:9 (SER-19)
+          seriesId ? 'Imagen del episodio (URL)' : 'Póster (URL)',
           <Input {...inputProps('poster_url')} type="url" defaultValue={movie?.poster_url ?? ''} placeholder="https://…" className={FIELD} />
         )}
+        {!video &&
+          field(
+            'backdrop_url',
+            'Imagen horizontal (URL)',
+            <Input {...inputProps('backdrop_url')} type="url" defaultValue={movie?.backdrop_url ?? ''} placeholder="https://…" className={FIELD} />,
+            'Fondo de la página de la serie (16:9).'
+          )}
         {video && (
           <div className="md:col-span-2">
             {field(

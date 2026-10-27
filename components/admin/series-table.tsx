@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Pencil, Tv, Eye } from 'lucide-react'
+import { Plus, Pencil, Tv, Eye, Sparkles } from 'lucide-react'
+import { fillEpisodesFromTmdbAction } from '@/lib/actions/tmdb.actions'
 import { deleteSeriesAction, publishSeriesDraftsAction, setSeriesStatusAction } from '@/lib/actions/series.actions'
 import type { MovieActionResult } from '@/lib/actions/movie.actions'
 import { formatDuration } from '@/lib/movies'
@@ -77,20 +78,24 @@ export function SeriesTable({ series }: { series: AdminSeries[] }) {
 }
 
 /** Episodios de la serie en orden + "Publicar borradores (N)" (SER-07) */
-export function SeriesEpisodes({ seriesId, episodes }: { seriesId: string; episodes: AdminEpisode[] }) {
+export function SeriesEpisodes({ seriesId, episodes, tmdbLinked = false }: { seriesId: string; episodes: AdminEpisode[]; tmdbLinked?: boolean }) {
   const [isPending, startTransition] = useTransition()
+  const [running, setRunning] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<MovieActionResult | null>(null)
   const drafts = episodes.filter((e) => e.status === 'draft').length
 
-  const publishDrafts = () =>
+  const run = (key: string, action: () => Promise<MovieActionResult>) => {
+    setRunning(key)
     startTransition(async () => {
       setFeedback(null)
       try {
-        setFeedback(await publishSeriesDraftsAction({ id: seriesId }))
+        setFeedback(await action())
       } catch {
         setFeedback({ error: 'Error de red. Revisa tu conexión.' })
       }
     })
+  }
+  const busy = (key: string) => (isPending && running === key) || undefined
 
   return (
     <section aria-labelledby="episodes-heading" className="space-y-4">
@@ -100,9 +105,15 @@ export function SeriesEpisodes({ seriesId, episodes }: { seriesId: string; episo
         </h3>
         <div className="flex flex-wrap gap-2">
           {drafts > 0 && (
-            <button type="button" className={ACTION_BUTTON} disabled={isPending} aria-busy={isPending || undefined} onClick={publishDrafts}>
-              {isPending ? <Spinner /> : <Eye className="h-3.5 w-3.5" />}
+            <button type="button" className={ACTION_BUTTON} disabled={isPending} aria-busy={busy('publish')} onClick={() => run('publish', () => publishSeriesDraftsAction({ id: seriesId }))}>
+              {busy('publish') ? <Spinner /> : <Eye className="h-3.5 w-3.5" />}
               Publicar borradores ({drafts})
+            </button>
+          )}
+          {tmdbLinked && episodes.length > 0 && (
+            <button type="button" className={ACTION_BUTTON} disabled={isPending} aria-busy={busy('tmdb')} onClick={() => run('tmdb', () => fillEpisodesFromTmdbAction({ seriesId }))}>
+              {busy('tmdb') ? <Spinner /> : <Sparkles className="h-3.5 w-3.5" />}
+              Completar episodios desde TMDB
             </button>
           )}
           <Link href={`/dashboard/admin/movies/new?serie=${seriesId}`} className={ACTION_BUTTON}>

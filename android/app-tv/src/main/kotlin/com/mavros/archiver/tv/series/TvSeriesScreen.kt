@@ -23,6 +23,14 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Spacer
+import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.Card
+import androidx.tv.material3.Border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
@@ -67,7 +75,7 @@ fun TvSeriesScreen(state: SeriesUiState, onPlay: (Movie, Double) -> Unit, onSele
 private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit, extra: @Composable () -> Unit) {
     val series = detail.series
     val play = remember { FocusRequester() }
-    // El botón vive en una LazyColumn: se crea después de esta composición, se reintenta cuadro a cuadro
+    // Los botones y las tarjetas se crean después de esta composición: se reintenta cuadro a cuadro
     LaunchedEffect(series.id) {
         repeat(30) {
             withFrameNanos { }
@@ -76,64 +84,86 @@ private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> 
     }
     val shown = detail.episodes.filter { it.seasonNumber == season }
 
-    Row(Modifier.fillMaxSize().padding(start = 64.dp, end = 64.dp, top = 48.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
-        Box(Modifier.width(260.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp)).background(MavrosColors.Card)) {
-            PosterImage(series, Modifier.fillMaxSize()) {}
-        }
-        LazyColumn(
-            Modifier.weight(1f).testTag("tv-series"),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 48.dp),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(series.title, style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold), color = MavrosColors.Foreground, modifier = Modifier.testTag("tv-title"))
-                    Text(
-                        (listOfNotNull(series.releaseYear?.toString(), CatalogSeries(series, detail.seasons.size, detail.episodes.size).countLabel) + series.genres)
-                            .joinToString(" · ").uppercase(),
-                        style = MonoLabel,
-                        color = MavrosColors.MutedForeground,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        detail.next?.let { next ->
-                            Button(onClick = { onPlay(next.episode, next.startAt) }, modifier = Modifier.focusRequester(play).testTag("tv-play")) {
-                                Text(next.label, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        // "Agregar a lista" (PL-07)
-                        extra()
-                    }
-                    series.synopsis?.let { Text(it, color = MavrosColors.Foreground, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge) }
-                }
-            }
-            if (detail.seasons.size > 1) {
-                item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 8.dp), modifier = Modifier.testTag("tv-seasons")) {
-                        items(detail.seasons) { s ->
-                            FilterChip(selected = s == season, onClick = { onSelectSeason(s) }, modifier = Modifier.testTag("tv-season-$s")) { Text(seasonName(s)) }
-                        }
-                    }
-                }
-            }
-            items(shown, key = { it.id }) { episode ->
-                val position = detail.progress[episode.id]
-                val inProgress = position != null && ProgressRules.isInProgress(position, episode.durationSeconds)
-                ListItem(
-                    selected = false,
-                    onClick = { onPlay(episode, ProgressRules.resumePosition(position, episode.durationSeconds)) },
-                    leadingContent = { Text("${episode.episodeNumber}", style = MaterialTheme.typography.titleLarge) },
-                    headlineContent = { Text(episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    supportingContent = if (inProgress) {
-                        {
-                            Box(Modifier.fillMaxWidth().height(4.dp).background(MavrosColors.Border)) {
-                                Box(Modifier.fillMaxWidth(ProgressRules.progressRatio(position!!, episode.durationSeconds)).height(4.dp).background(MavrosColors.Accent))
-                            }
-                        }
-                    } else null,
-                    trailingContent = { Text(formatDurationShort(episode.durationSeconds), style = MonoLabel) },
-                    modifier = Modifier.testTag("tv-episode-${episode.id}"),
+    Box(Modifier.fillMaxSize()) {
+        // Fondo: imagen horizontal (o el póster desenfocado) con degradados para leer encima (SER-17)
+        val background = series.background
+        PosterImage(background, Modifier.fillMaxSize().then(if (background.isWide) Modifier else Modifier.blur(32.dp))) {}
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to MavrosColors.Background, 0.55f to MavrosColors.Background.copy(alpha = 0.7f), 1f to Color.Transparent)))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to MavrosColors.Background)))
+
+        Column(Modifier.fillMaxSize().padding(start = 64.dp, top = 48.dp, bottom = 32.dp).testTag("tv-series"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.width(620.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(series.title, style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold), color = MavrosColors.Foreground, modifier = Modifier.testTag("tv-title"))
+                Text(
+                    (listOfNotNull(series.releaseYear?.toString(), CatalogSeries(series, detail.seasons.size, detail.episodes.size).countLabel) + series.genres)
+                        .joinToString(" · ").uppercase(),
+                    style = MonoLabel,
+                    color = MavrosColors.Foreground.copy(alpha = 0.85f),
                 )
+                series.synopsis?.let { Text(it, color = MavrosColors.Foreground, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge) }
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    detail.next?.let { next ->
+                        Button(onClick = { onPlay(next.episode, next.startAt) }, modifier = Modifier.focusRequester(play).testTag("tv-play")) {
+                            Text(next.label, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    // "Agregar a lista" (PL-07)
+                    extra()
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            if (detail.seasons.size > 1) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 64.dp), modifier = Modifier.testTag("tv-seasons")) {
+                    items(detail.seasons) { s ->
+                        FilterChip(selected = s == season, onClick = { onSelectSeason(s) }, modifier = Modifier.testTag("tv-season-$s")) { Text(seasonName(s)) }
+                    }
+                }
+            } else {
+                season?.let { Text(seasonName(it), style = MaterialTheme.typography.titleMedium, color = MavrosColors.Foreground) }
+            }
+            // Episodios en fila de tarjetas 16:9 (SER-18)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(end = 64.dp, top = 8.dp, bottom = 8.dp), modifier = Modifier.testTag("tv-episodes")) {
+                items(shown, key = { it.id }) { episode ->
+                    val position = detail.progress[episode.id]
+                    TvEpisodeCard(episode, position, isNext = detail.next?.episode?.id == episode.id) {
+                        onPlay(episode, ProgressRules.resumePosition(position, episode.durationSeconds))
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun TvEpisodeCard(episode: Movie, position: Double?, isNext: Boolean, onClick: () -> Unit) {
+    val inProgress = position != null && ProgressRules.isInProgress(position, episode.durationSeconds)
+    val shape = RoundedCornerShape(12.dp)
+    Column(Modifier.width(300.dp)) {
+        Card(
+            onClick = onClick,
+            shape = CardDefaults.shape(shape),
+            scale = CardDefaults.scale(focusedScale = 1.06f),
+            border = CardDefaults.border(
+                border = if (isNext) Border(BorderStroke(2.dp, MavrosColors.Accent.copy(alpha = 0.6f)), shape = shape) else Border.None,
+                focusedBorder = Border(BorderStroke(3.dp, MavrosColors.Accent), shape = shape),
+            ),
+            colors = CardDefaults.colors(containerColor = MavrosColors.Card),
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).testTag("tv-episode-${episode.id}"),
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                PosterImage(episode, Modifier.fillMaxSize()) {
+                    Text(episode.title, color = MavrosColors.MutedForeground, modifier = Modifier.align(Alignment.Center).padding(12.dp), maxLines = 2)
+                }
+                if (inProgress) {
+                    Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(5.dp).background(MavrosColors.Background.copy(alpha = 0.6f))) {
+                        Box(Modifier.fillMaxWidth(ProgressRules.progressRatio(position!!, episode.durationSeconds)).height(5.dp).background(MavrosColors.Accent))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Text("${episode.episodeNumber}. ${episode.title}", color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+        Text(formatDurationShort(episode.durationSeconds), style = MonoLabel, color = MavrosColors.MutedForeground)
+        episode.synopsis?.let { Text(it, color = MavrosColors.MutedForeground, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) }
     }
 }

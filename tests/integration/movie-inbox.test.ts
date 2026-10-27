@@ -132,3 +132,100 @@ describe('episodios en la carpeta de entrada (SER-14)', () => {
     expect(data).toHaveLength(2)
   }, 120_000)
 })
+
+// TMDB-04: otra carpeta, con un TMDB falso. La de arriba corre sin clave (todo sigue como antes).
+import { startFakeTmdb, tmdbFixtures } from '../helpers/fake-tmdb'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+describe('datos automáticos con TMDB (TMDB-04)', () => {
+  const SHOW = 5000 + Math.floor(Math.random() * 1000)
+  const MOVIE = 7000 + Math.floor(Math.random() * 1000)
+  let tbase: string
+  let tmdb: Awaited<ReturnType<typeof startFakeTmdb>>
+  const showName = `Serie TMDB Entrada ${tag}`
+  const showSlug = `serie-tmdb-entrada-${tag}`
+  const movieFile = `Peli TMDB ${tag} (1988).mp4`
+
+  // Asíncrono: el TMDB falso vive en este proceso y tiene que poder responder mientras corre
+  const runWithTmdb = () =>
+    promisify(execFile)('node', [path.join(ROOT, 'scripts/movie-inbox.mjs')], {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        MAVROS_INBOX: tbase,
+        MAVROS_ENV_FILE: envFile,
+        R2_REMOTE: path.join(tbase, 'r2'),
+        PRESET: 'veryfast',
+        TMDB_API_KEY: 'clave-de-prueba',
+        TMDB_API_URL: tmdb.url,
+        TMDB_IMAGE_URL: 'https://image.invalid/t/p',
+      },
+    })
+
+  beforeAll(async () => {
+    tmdb = await startFakeTmdb(tmdbFixtures(SHOW, MOVIE))
+    tbase = mkdtempSync(path.join(tmpdir(), 'mavros-inbox-tmdb-'))
+    mkdirSync(path.join(tbase, 'Entrada', `${showName} (2008)`), { recursive: true })
+    for (const f of [`${showName} (2008)/S01E02.mp4`, `${showName} (2008)/S01E03.mp4`, movieFile]) {
+      const file = path.join(tbase, 'Entrada', f)
+      execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine', '-t', '3', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', file])
+      old(file)
+    }
+    await runWithTmdb()
+    await runWithTmdb()
+  }, 600_000)
+
+  afterAll(async () => {
+    await adminClient().from('series').delete().eq('slug', showSlug)
+    await adminClient().from('movies').delete().like('slug', `peli-tmdb-${tag}%`)
+    rmSync(tbase, { recursive: true, force: true })
+    await tmdb.close()
+  })
+
+  it('la serie nueva se crea con los datos de TMDB (título y año del archivo)', async () => {
+    const { data } = await adminClient().from('series').select('*').eq('slug', showSlug).single()
+    expect(data).toMatchObject({
+      title: showName,
+      release_year: 2008,
+      tmdb_id: SHOW,
+      synopsis: 'Sinopsis de la serie.',
+      genres: ['drama', 'crimen'],
+      poster_url: 'https://image.invalid/t/p/w780/sp.jpg',
+      backdrop_url: 'https://image.invalid/t/p/w1280/sb.jpg',
+    })
+  })
+
+  it('el episodio toma título (en inglés si no hay español), sinopsis e imagen de TMDB', async () => {
+    const { data } = await adminClient().from('movies').select('title, synopsis, poster_url').eq('slug', `${showSlug}-s01e02`).single()
+    expect(data).toEqual({ title: 'The Cat', synopsis: 'Second one.', poster_url: 'https://image.invalid/t/p/w780/e2.jpg' })
+  })
+
+  it('sin imagen en TMDB, la imagen del episodio es un cuadro del video', async () => {
+    const { data } = await adminClient().from('movies').select('title, poster_url, poster_image_url, poster_thumbhash').eq('slug', `${showSlug}-s01e03`).single()
+    expect(data!.title).toBe('Episodio 3')
+    expect(data!.poster_url).toBeNull()
+    expect(data!.poster_image_url).toMatch(/\/posters\/[0-9a-f]{32}\.webp$/)
+    expect(data!.poster_thumbhash).toBeTruthy()
+    const res = await fetch(data!.poster_image_url!)
+    expect(res.headers.get('content-type')).toBe('image/webp')
+  })
+
+  it('la película se completa sin cambiar su título', async () => {
+    const { data } = await adminClient().from('movies').select('title, release_year, synopsis, genres, tmdb_id, poster_url').eq('slug', `peli-tmdb-${tag}`).single()
+    expect(data).toEqual({
+      title: `Peli TMDB ${tag}`,
+      release_year: 1988,
+      synopsis: 'Neo-Tokio, 2019.',
+      genres: ['animación', 'ciencia ficción'],
+      tmdb_id: MOVIE,
+      poster_url: 'https://image.invalid/t/p/w780/mp.jpg',
+    })
+  })
+
+  it('los tres pasaron a Procesadas', () => {
+    expect(existsSync(path.join(tbase, 'Procesadas', `${showName} (2008)`, 'S01E02.mp4'))).toBe(true)
+    expect(existsSync(path.join(tbase, 'Procesadas', `${showName} (2008)`, 'S01E03.mp4'))).toBe(true)
+    expect(existsSync(path.join(tbase, 'Procesadas', movieFile))).toBe(true)
+  })
+})

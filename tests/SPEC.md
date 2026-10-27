@@ -423,6 +423,14 @@ Una serie agrupa episodios. Cada episodio es un video como una película (misma 
 | SER-12 | Ver un episodio (`/dashboard/watch/<slug>`): muestra la serie (enlace a su página), "Temporada 1 · Episodio 2" y el título del episodio. Al terminar, si hay siguiente episodio visible aparece **"Siguiente episodio"** con cuenta regresiva de 10 s que lo abre sola (desde el principio, PRG-02), con botones "Ver ahora" y "Cancelar". En el último episodio no aparece. |
 | SER-13 | Orden de episodios: temporada ascendente y episodio ascendente; la temporada 0 (especiales) va al final. "Siguiente" cruza temporadas (último de T1 → T2:E1). Las mismas reglas dan exactamente lo mismo en web y Android (casos compartidos). |
 
+### Página de la serie al estilo de una plataforma de streaming
+
+| ID | Requisito |
+|---|---|
+| SER-17 | La página de la serie abre con una **imagen horizontal** de fondo (con su vista previa borrosa mientras carga, LOAD-02) y encima: título, año, temporadas, géneros, sinopsis, el botón de SER-10 y "Agregar a lista". Sin imagen horizontal, se usa el póster como fondo. |
+| SER-18 | Los episodios se eligen por temporada (selector) y cada uno muestra **su imagen 16:9** (con la barra de progreso encima si va a medias), número, título, duración y las primeras líneas de su sinopsis. El episodio de SER-10 queda resaltado. Lo mismo en el teléfono; en la tele la imagen horizontal queda de fondo y los episodios van en una fila de tarjetas 16:9 que se recorre con el control. |
+| SER-19 | En el panel, la serie tiene el campo **Imagen horizontal (URL)** (con copia optimizada y vista previa como los pósters, LOAD-03/LOAD-07) y en un episodio el póster es **su imagen**. |
+
 ### Carpeta de la Mac (VID-09)
 
 | ID | Requisito |
@@ -461,3 +469,15 @@ Cada usuario arma sus propias listas con películas y series, en el orden que qu
 | ID | Requisito |
 |---|---|
 | PL-07 | Teléfono y tele tienen **Mis listas**: ver mis listas y abrir una para ver sus elementos en orden; tocar uno abre su detalle (película) o su página (serie). **Reproducir lista** como en PL-05 y, al terminar cada elemento, "Siguiente en la lista" como PL-06 (mismas reglas, casos compartidos). En el detalle y en la página de una serie hay **Agregar a lista** con mis listas marcadas (agrega o quita). |
+
+## Fase T — Datos automáticos con TMDB
+
+TMDB (themoviedb.org) es la base de datos gratuita de películas y series. Se usa solo para **llenar datos** (títulos, sinopsis, imágenes); la app sigue siendo la misma. La regla general: **TMDB nunca pisa lo que ya escribiste** y si TMDB falla o no encuentra nada, todo sigue funcionando como antes.
+
+| ID | Requisito |
+|---|---|
+| TMDB-01 | La clave (`TMDB_API_KEY`) vive solo en el servidor y en la Mac (`.env.local`); nunca en el navegador, en el código del cliente ni en las apps Android. Sin clave, las funciones de TMDB dicen que falta configurarla y nada más cambia. |
+| TMDB-02 | En el panel, editar una película o una serie tiene **Buscar en TMDB**: busca por el título (y el año si hay) y muestra hasta 5 resultados con póster, título y año. Al elegir uno se llenan **solo los campos vacíos** (título original, sinopsis, año, géneros, póster y, en series, la imagen horizontal) y se guarda su id de TMDB. El título nunca cambia. Las imágenes tienen copia optimizada y vista previa (LOAD-03/LOAD-07). |
+| TMDB-03 | Una serie con TMDB tiene **Completar episodios desde TMDB**: a cada episodio le pone el título (solo si está vacío o es el genérico "Episodio N"), la sinopsis (si está vacía) y su imagen (si no tiene). Los textos van en español de México; si TMDB no tiene traducción, en inglés. |
+| TMDB-04 | Carpeta de la Mac: una película nueva se busca en TMDB por nombre y año y, si hay resultado, se llena como TMDB-02. Una serie nueva igual; cada episodio toma título, sinopsis e imagen de TMDB (TMDB-03). Si el episodio no tiene imagen en TMDB se usa **un cuadro del propio video** (~25 % de la duración). Sin clave, sin red o sin resultado, sigue como antes: nunca manda el archivo a Errores por eso. |
+| TMDB-05 | Los géneros de TMDB se guardan normalizados (MOV-10). Donde se muestran datos de TMDB se reconoce la fuente ("Datos e imágenes: TMDB"), como piden sus condiciones de uso. |

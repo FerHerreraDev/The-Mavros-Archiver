@@ -55,10 +55,27 @@ data class Series(
     @SerialName("poster_url") val posterUrl: String? = null,
     @SerialName("poster_image_url") val posterImageUrl: String? = null,
     @SerialName("poster_thumbhash") override val posterThumbhash: String? = null,
+    /** Imagen horizontal de fondo de su página (SER-17) */
+    @SerialName("backdrop_url") val backdropUrl: String? = null,
+    @SerialName("backdrop_image_url") val backdropImageUrl: String? = null,
+    @SerialName("backdrop_thumbhash") val backdropThumbhash: String? = null,
+    @SerialName("tmdb_id") val tmdbId: Int? = null,
     val status: String = "published",
     @SerialName("published_at") val publishedAt: String? = null,
 ) : HasPoster {
     override val posterSrc: String? get() = posterImageUrl ?: posterUrl
+
+    /** Fondo de la página: la imagen horizontal o, si no hay, el póster (SER-17) */
+    val background: Background get() {
+        val wide = backdropImageUrl ?: backdropUrl
+        return if (wide != null) Background(this, wide, backdropThumbhash, isWide = true) else Background(this, posterSrc, posterThumbhash, isWide = false)
+    }
+}
+
+/** Imagen de fondo de una serie como "póster" para PosterImage */
+data class Background(private val series: Series, override val posterSrc: String?, override val posterThumbhash: String?, val isWide: Boolean) : HasPoster {
+    override val id: String get() = "${series.id}-fondo"
+    override val title: String get() = series.title
 }
 
 /** Serie en el catálogo con cuántas temporadas y episodios visibles tiene (SER-08) */

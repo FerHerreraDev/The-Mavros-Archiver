@@ -148,6 +148,14 @@ class TvScreensTest {
         compose.onNodeWithTag("tv-episode-e1").assertIsDisplayed()
         compose.onNodeWithTag("tv-episode-e3").assertDoesNotExist()
         compose.onNodeWithTag("tv-season-2").assertIsDisplayed()
+        // SER-18: abajo, la fila de episodios 16:9 se recorre con el control (↓ baja de los botones a las temporadas y a la fila)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionDown) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-episode-e1").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("tv-episode-e2").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("e2" to 0.0, played)
     }
 
     @Test fun `SER-16 siguiente episodio - Ver ahora enfocado, OK lo reproduce`() {

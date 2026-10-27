@@ -48,6 +48,27 @@ describe('SEC-03 el cliente admin (service role) es solo de servidor', () => {
   })
 })
 
+describe('TMDB-01 la clave de TMDB solo vive en el servidor', () => {
+  const files = ['app', 'components', 'lib'].flatMap((d) =>
+    sourceFiles(path.join(root, d)).concat(readdirSync(path.join(root, d), { recursive: true, withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.endsWith('.mjs'))
+      .map((e) => path.join(e.parentPath, e.name)))
+  )
+
+  it('solo la lee el cliente de TMDB (servidor y Mac)', () => {
+    const readers = files.filter((f) => readFileSync(f, 'utf8').includes('TMDB_API_KEY')).map((f) => path.relative(root, f))
+    expect(readers).toEqual(['lib/tmdb/client.mjs'])
+  })
+
+  it('ningún componente de cliente usa el cliente de TMDB (a lo más sus tipos)', () => {
+    const offenders = files.filter((f) => {
+      const src = readFileSync(f, 'utf8')
+      return /^\s*['"]use client['"]/m.test(src) && /^import\s+(?!type\b).*tmdb\/client/m.test(src)
+    })
+    expect(offenders.map((f) => path.relative(root, f))).toEqual([])
+  })
+})
+
 describe('MOB-01 la app Android no lleva secretos', () => {
   const androidDir = path.join(root, 'android')
   const files = (dir: string): string[] =>
@@ -58,9 +79,9 @@ describe('MOB-01 la app Android no lleva secretos', () => {
       return /\.(kt|kts|xml|properties|toml|pro)$/.test(name) ? [full] : []
     })
 
-  it('ni el código ni la configuración de la app mencionan la service role key ni el secreto del video', () => {
+  it('ni el código ni la configuración de la app mencionan la service role key, el secreto del video ni la clave de TMDB', () => {
     const offenders = files(androidDir).filter((f) =>
-      /service_role|SERVICE_ROLE|VIDEO_TOKEN_SECRET|sb_secret_/.test(readFileSync(f, 'utf8'))
+      /service_role|SERVICE_ROLE|VIDEO_TOKEN_SECRET|sb_secret_|TMDB_API_KEY/.test(readFileSync(f, 'utf8'))
     )
     expect(offenders.map((f) => path.relative(root, f))).toEqual([])
   })

@@ -45,7 +45,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 private val show = series("s", "Breaking Bad")
-private val s1e1 = episode("e1", 1, 1, "Piloto")
+private val s1e1 = episode("e1", 1, 1, "Piloto").copy(synopsis = "Walter recibe una noticia.")
 private val s1e2 = episode("e2", 1, 2, "El gato")
 private val s2e1 = episode("e3", 2, 1, "Siete treinta y siete")
 
@@ -98,7 +98,11 @@ class SeriesScreensTest {
         content { SeriesContent(SeriesUiState.Content(d, season), {}, { m, s -> played = m.id to s }, { season = it }, {}) }
 
         compose.onNodeWithTag("title").assertTextContains("Breaking Bad")
+        // SER-17: portada arriba; SER-18: el episodio con su sinopsis
+        compose.onNodeWithTag("hero").assertIsDisplayed()
         compose.onNodeWithTag("play").assertTextContains("Continuar T1:E1 desde 6:40")
+        compose.onNodeWithTag("series").performScrollToNode(hasTestTag("episode-e1"))
+        compose.onNodeWithTag("synopsis-e1", useUnmergedTree = true).assertTextContains("Walter recibe una noticia.")
         compose.onNodeWithTag("progress-e1", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("episode-e3").assertDoesNotExist()
 

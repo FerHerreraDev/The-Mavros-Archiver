@@ -21,6 +21,11 @@ create table if not exists public.series (
   poster_url        text,
   poster_image_url  text,
   poster_thumbhash  text,
+  -- Imagen horizontal de fondo de su página (SER-17)
+  backdrop_url        text,
+  backdrop_image_url  text,
+  backdrop_thumbhash  text,
+  tmdb_id           integer,
   status            text not null default 'draft',
   created_by        uuid references auth.users (id) on delete set null default auth.uid(),
   created_at        timestamptz not null default now(),
@@ -37,6 +42,13 @@ create table if not exists public.series (
     poster_thumbhash is null
     or (poster_thumbhash ~ '^[A-Za-z0-9+/]+={0,2}$' and char_length(poster_thumbhash) between 8 and 64)
   ),
+  constraint series_backdrop_https check (backdrop_url is null or backdrop_url ~ '^https://'),
+  constraint series_backdrop_image_https check (backdrop_image_url is null or backdrop_image_url ~ '^https?://'),
+  constraint series_backdrop_thumbhash_format check (
+    backdrop_thumbhash is null
+    or (backdrop_thumbhash ~ '^[A-Za-z0-9+/]+={0,2}$' and char_length(backdrop_thumbhash) between 8 and 64)
+  ),
+  constraint series_tmdb_id_positive check (tmdb_id is null or tmdb_id > 0),
   constraint series_status check (status in ('draft', 'published'))
 );
 
@@ -96,6 +108,10 @@ create policy "series_delete_admin"
 alter table public.movies add column if not exists series_id uuid references public.series (id) on delete cascade;
 alter table public.movies add column if not exists season_number integer;
 alter table public.movies add column if not exists episode_number integer;
+-- Película o serie en TMDB (TMDB-02); en un episodio, el póster es su imagen 16:9 (SER-19)
+alter table public.movies add column if not exists tmdb_id integer;
+alter table public.movies drop constraint if exists movies_tmdb_id_positive;
+alter table public.movies add constraint movies_tmdb_id_positive check (tmdb_id is null or tmdb_id > 0);
 
 alter table public.movies drop constraint if exists movies_episode_fields;
 alter table public.movies add constraint movies_episode_fields check (
