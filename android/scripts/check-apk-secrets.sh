@@ -10,8 +10,9 @@ unzip -q -o "$APK" -d "$TMP"
 
 secrets=()
 if [ -f "$ROOT/.env.local" ]; then
-  while IFS='=' read -r key value; do
-    case "$key" in SUPABASE_SERVICE_ROLE_KEY|VIDEO_TOKEN_SECRET) [ -n "$value" ] && secrets+=("$key=$value") ;; esac
+  # || [ -n "$key" ]: también la última línea aunque no termine en salto de línea
+  while IFS='=' read -r key value || [ -n "$key" ]; do
+    case "$key" in SUPABASE_SERVICE_ROLE_KEY|VIDEO_TOKEN_SECRET|TMDB_API_KEY) [ -n "$value" ] && secrets+=("$key=$value") ;; esac
   done < "$ROOT/.env.local"
 fi
 local_service=$("$ROOT/node_modules/.bin/supabase" status -o json 2>/dev/null | python3 -c "import sys,json;raw=sys.stdin.read();print(json.loads(raw[raw.find('{'):]).get('SERVICE_ROLE_KEY','') if '{' in raw else '')" 2>/dev/null || true)
