@@ -26,7 +26,8 @@ cat > "$PLIST" <<PLIST
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
   <key>StandardOutPath</key><string>$HOME/Library/Logs/mavros-inbox.log</string>
   <key>StandardErrorPath</key><string>$HOME/Library/Logs/mavros-inbox.log</string>
-  <key>ProcessType</key><string>Background</string>
+  <!-- Standard, no Background: en Apple Silicon "Background" deja a ffmpeg solo en los núcleos de eficiencia (decenas de horas por película) -->
+  <key>ProcessType</key><string>Standard</string>
 </dict>
 </plist>
 PLIST

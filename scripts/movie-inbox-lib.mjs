@@ -36,3 +36,47 @@ export function uniqueSlug(slug, taken) {
   if (!taken.has(slug)) return slug
   for (let n = 2; ; n++) if (!taken.has(`${slug}-${n}`)) return `${slug}-${n}`
 }
+
+// --- Avance (VID-10) -------------------------------------------------------------
+
+/** Fracción convertida: segmentos de 6 s ya escritos de la primera calidad / duración del original */
+export function encodeFraction(segmentsWritten, sourceSeconds, segmentSeconds = 6) {
+  if (!(sourceSeconds > 0)) return 0
+  return Math.min(1, Math.max(0, (segmentsWritten * segmentSeconds) / sourceSeconds))
+}
+
+/** Tiempo restante a partir de lo que tardó lo hecho: null si aún no hay con qué estimar */
+export function remainingMs(fraction, elapsedMs) {
+  if (!(fraction > 0.01) || fraction >= 1) return fraction >= 1 ? 0 : null
+  return (elapsedMs * (1 - fraction)) / fraction
+}
+
+/** 95 s → "~2 min", 3 h 5 min → "~3 h 5 min", null → "calculando…" */
+export function formatRemaining(ms) {
+  if (ms === null || ms === undefined) return 'calculando…'
+  const min = Math.max(1, Math.round(ms / 60_000))
+  if (min < 60) return `~${min} min`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m ? `~${h} h ${m} min` : `~${h} h`
+}
+
+/** ▓▓▓▓░░░░░░ de 10 casillas */
+export function bar(fraction, width = 10) {
+  const full = Math.round(Math.min(1, Math.max(0, fraction)) * width)
+  return '▓'.repeat(full) + '░'.repeat(width - full)
+}
+
+/** Línea de rclone (--stats-one-line): "… 1.2 GiB / 3.4 GiB, 35%, 10 MiB/s, ETA 3m40s" → { fraction, eta } */
+export function parseRcloneStats(line) {
+  const m = line.match(/,\s*(\d+)%/)
+  if (!m) return null
+  const eta = line.match(/ETA\s+([0-9hms.-]+)/)?.[1] ?? null
+  return { fraction: Number(m[1]) / 100, eta }
+}
+
+/** Nombre del archivo de estado que se ve en Finder (sin caracteres prohibidos en macOS) */
+export function statusFileName(title, step, fraction, remaining) {
+  const pct = `${Math.round(fraction * 100)}%`
+  return `⏳ ${title.replace(/[/:]/g, '-')} — ${step} ${bar(fraction)} ${pct} · faltan ${formatRemaining(remaining)}.txt`
+}

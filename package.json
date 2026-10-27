@@ -21,6 +21,7 @@
     "video:deploy": "pnpm dlx wrangler@4.152.0 deploy --config workers/video/wrangler.toml",
     "movie:inbox": "node scripts/movie-inbox.mjs",
     "movie:inbox:install": "scripts/install-movie-inbox.sh",
+    "movie:progreso": "node scripts/movie-progress.mjs",
     "video:url": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/video-url.ts",
     "android:test": "cd android && ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest :app-tv:testLocalDebugUnitTest :core:data:integrationTest",
     "android:e2e": "android/scripts/e2e-emulator.sh",
