@@ -33,8 +33,9 @@ jobs:
           pnpm lint
 
       # VID-08 codifica un video real con scripts/encode-hls.sh
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      # ffmpeg convierte y rclone "sube" a un R2 local en la prueba de la carpeta de la Mac (VID-09, TMDB-04)
+      - name: Install ffmpeg and rclone
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg rclone
 
       - name: Unit tests
         run: pnpm test
