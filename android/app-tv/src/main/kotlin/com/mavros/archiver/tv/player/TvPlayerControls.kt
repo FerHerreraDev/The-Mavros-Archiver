@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,12 +39,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import com.mavros.archiver.core.android.player.NEXT_EPISODE_COUNTDOWN_SECONDS
 import com.mavros.archiver.core.design.MavrosColors
+import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.formatTimestamp
 import kotlinx.coroutines.delay
 
@@ -178,6 +184,37 @@ private fun QualityDialog(qualities: List<Pair<Int?, String>>, selected: Int?, o
                 withFrameNanos { }
                 if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
             }
+        }
+    }
+}
+
+/** "Siguiente episodio en 10 s" con "Ver ahora" enfocado y "Cancelar" (SER-16) */
+@Composable
+fun TvNextEpisode(next: Movie, onPlay: (Movie) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    var left by remember(next.id) { mutableIntStateOf(NEXT_EPISODE_COUNTDOWN_SECONDS) }
+    val now = remember { FocusRequester() }
+    LaunchedEffect(next.id) {
+        runCatching { now.requestFocus() }
+        while (left > 0) {
+            delay(1_000)
+            left--
+        }
+        onPlay(next)
+    }
+    Column(
+        modifier
+            .padding(48.dp)
+            .width(420.dp)
+            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
+            .padding(24.dp)
+            .testTag("tv-next-episode"),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Siguiente episodio en $left s", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("tv-next-countdown"))
+        Text("${next.episodeTag} · ${next.title}", color = MavrosColors.Foreground, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { onPlay(next) }, modifier = Modifier.focusRequester(now).testTag("tv-next-now")) { Text("Ver ahora") }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("tv-next-cancel")) { Text("Cancelar") }
         }
     }
 }

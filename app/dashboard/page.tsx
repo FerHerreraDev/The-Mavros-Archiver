@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { Film } from 'lucide-react'
 import { getCatalog } from '@/lib/data/catalog'
-import { MovieCard } from '@/components/catalog/movie-card'
+import { MovieCard, SeriesCard } from '@/components/catalog/movie-card'
 import { GenreFilter } from '@/components/catalog/genre-filter'
 import { CatalogSkeleton } from '@/components/catalog/catalog-skeleton'
 
@@ -17,7 +17,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 }
 
 async function Catalog({ genre }: { genre?: string }) {
-  const { genres, recent, continueWatching } = await getCatalog(genre)
+  const { genres, recent, series, continueWatching } = await getCatalog(genre)
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
@@ -25,8 +25,8 @@ async function Catalog({ genre }: { genre?: string }) {
         <section aria-labelledby="continue-heading" className="space-y-4">
           <h2 id="continue-heading" className="text-xl font-bold tracking-tight">Seguir viendo</h2>
           <div className={GRID}>
-            {continueWatching.map(({ movie, positionSeconds }) => (
-              <MovieCard key={movie.id} movie={movie} positionSeconds={positionSeconds} />
+            {continueWatching.map(({ movie, positionSeconds, episode }) => (
+              <MovieCard key={movie.id} movie={movie} positionSeconds={positionSeconds} episode={episode} />
             ))}
           </div>
         </section>
@@ -40,13 +40,14 @@ async function Catalog({ genre }: { genre?: string }) {
 
         <GenreFilter genres={genres} active={genre} />
 
-        {recent.length > 0 ? (
+        {recent.length > 0 && (
           <div className={GRID}>
             {recent.map((movie) => (
               <MovieCard key={movie.id} movie={movie} />
             ))}
           </div>
-        ) : (
+        )}
+        {recent.length === 0 && series.length === 0 && (
           <div className="bg-card/50 backdrop-blur-xl border border-border rounded-2xl p-12 text-center space-y-2">
             <Film className="h-8 w-8 mx-auto text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
@@ -55,6 +56,17 @@ async function Catalog({ genre }: { genre?: string }) {
           </div>
         )}
       </section>
+
+      {series.length > 0 && (
+        <section aria-labelledby="series-heading" className="space-y-4">
+          <h2 id="series-heading" className="text-2xl font-bold tracking-tight">Series</h2>
+          <div className={GRID}>
+            {series.map((s) => (
+              <SeriesCard key={s.id} series={s} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

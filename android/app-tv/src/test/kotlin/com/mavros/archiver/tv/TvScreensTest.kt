@@ -118,4 +118,50 @@ class TvScreensTest {
         compose.waitForIdle()
         assertEquals(1, signedOut)
     }
+
+    // --- Series (SER-15, SER-16) ---------------------------------------------
+
+    private val show = com.mavros.archiver.core.model.Series(id = "s", slug = "s", title = "Breaking Bad", releaseYear = 2008)
+    private fun ep(id: String, season: Int, n: Int, title: String) =
+        com.mavros.archiver.core.model.Movie(id = id, slug = id, title = title, durationSeconds = 1000, seriesId = "s", seasonNumber = season, episodeNumber = n)
+    private val episodes = listOf(ep("e1", 1, 1, "Piloto"), ep("e2", 1, 2, "El gato"), ep("e3", 2, 1, "Siete"))
+
+    @Test fun `SER-15 serie - el boton de que sigue queda enfocado y abajo estan los episodios de la temporada`() {
+        val progress = listOf(com.mavros.archiver.core.model.EpisodeProgress("e1", 990.0, "2026-01-01T00:00:00Z"))
+        val detail = com.mavros.archiver.core.model.SeriesDetail(show, episodes, mapOf("e1" to 990.0), com.mavros.archiver.core.model.SeriesRules.nextUp(episodes, progress))
+        var played: Pair<String, Double>? = null
+        var season by mutableStateOf<Int?>(1)
+        content {
+            com.mavros.archiver.tv.series.TvSeriesScreen(
+                com.mavros.archiver.core.android.series.SeriesUiState.Content(detail, season),
+                onPlay = { m, s -> played = m.id to s },
+                onSelectSeason = { season = it },
+                onRetry = {},
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-play").assertIsFocused().assertTextContains("Reproducir T1:E2")
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("e2" to 0.0, played)
+        compose.onNodeWithTag("tv-episode-e1").assertIsDisplayed()
+        compose.onNodeWithTag("tv-episode-e3").assertDoesNotExist()
+        compose.onNodeWithTag("tv-season-2").assertIsDisplayed()
+    }
+
+    @Test fun `SER-16 siguiente episodio - Ver ahora enfocado, OK lo reproduce`() {
+        var played: String? = null
+        var cancelled = 0
+        content { com.mavros.archiver.tv.player.TvNextEpisode(episodes[1], { played = it.id }, { cancelled++ }) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-next-countdown").assertTextContains("Siguiente episodio en", substring = true)
+        compose.onNodeWithText("T1:E2 · El gato").assertIsDisplayed()
+        compose.onNodeWithTag("tv-next-now").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("e2", played)
+    }
+
+    @Test fun `SER-12 detalle de un episodio muestra su serie`() {
+        content { TvDetailScreen(DetailUiState.Content(MovieDetail(episodes[1], null, show)), onPlay = { _, _ -> }, onRetry = {}) }
+        compose.onNodeWithTag("tv-series-line").assertTextContains("Breaking Bad · T1:E2")
+    }
 }

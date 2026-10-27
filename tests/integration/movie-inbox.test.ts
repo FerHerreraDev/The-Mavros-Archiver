@@ -15,6 +15,11 @@ let envFile: string
 const tag = Math.random().toString(36).slice(2, 7)
 const good = `Prueba Entrada ${tag} (1999).mp4`
 const broken = `Rota ${tag} (2020).mp4`
+// SER-14: un episodio dentro de la carpeta de su serie y otro con la serie en el nombre
+const showName = `Serie Entrada ${tag}`
+const showSlug = `serie-entrada-${tag}`
+const inFolder = `${showName} (2010)/S01E01 - Piloto.mp4`
+const named = `${showName} - S01E02.mp4`
 
 function runInbox() {
   execFileSync('node', [path.join(ROOT, 'scripts/movie-inbox.mjs')], {
@@ -36,6 +41,12 @@ beforeAll(() => {
   const src = path.join(base, 'Entrada', good)
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440',
     '-t', '8', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', src])
+  mkdirSync(path.join(base, 'Entrada', `${showName} (2010)`))
+  for (const f of [inFolder, named]) {
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440',
+      '-t', '4', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', path.join(base, 'Entrada', f)])
+    old(path.join(base, 'Entrada', f))
+  }
   writeFileSync(path.join(base, 'Entrada', broken), 'esto no es un video')
   writeFileSync(path.join(base, 'Entrada', 'notas.txt'), 'ignorar')
   for (const f of [good, broken]) old(path.join(base, 'Entrada', f))
@@ -46,6 +57,7 @@ beforeAll(() => {
 
 afterAll(async () => {
   await adminClient().from('movies').delete().like('slug', `prueba-entrada-${tag}%`)
+  await adminClient().from('series').delete().eq('slug', showSlug)
   rmSync(base, { recursive: true, force: true })
 })
 
@@ -75,4 +87,48 @@ describe('carpeta de entrada (VID-09)', () => {
     const { data } = await adminClient().from('movies').select('id').like('slug', `prueba-entrada-${tag}%`)
     expect(data).toHaveLength(1)
   })
+})
+
+describe('episodios en la carpeta de entrada (SER-14)', () => {
+  it('crea la serie en borrador (título y año de la carpeta) una sola vez', async () => {
+    const { data } = await adminClient().from('series').select('*').eq('slug', showSlug)
+    expect(data).toHaveLength(1)
+    expect(data![0]).toMatchObject({ title: showName, release_year: 2010, status: 'draft' })
+  })
+
+  it('cada episodio queda en borrador dentro de su serie, con slug, título y video en series/<serie>/s01e0N', async () => {
+    const { data: show } = await adminClient().from('series').select('id').eq('slug', showSlug).single()
+    const { data } = await adminClient()
+      .from('movies')
+      .select('slug, title, status, season_number, episode_number, hls_path, duration_seconds')
+      .eq('series_id', show!.id)
+      .order('episode_number')
+    expect(data).toMatchObject([
+      { slug: `${showSlug}-s01e01`, title: 'Piloto', status: 'draft', season_number: 1, episode_number: 1, hls_path: `series/${showSlug}/s01e01/master.m3u8` },
+      { slug: `${showSlug}-s01e02`, title: 'Episodio 2', status: 'draft', season_number: 1, episode_number: 2, hls_path: `series/${showSlug}/s01e02/master.m3u8` },
+    ])
+    expect(Math.abs(data![0].duration_seconds - 4)).toBeLessThanOrEqual(1)
+    expect(readFileSync(path.join(fakeR2, `series/${showSlug}/s01e02/master.m3u8`), 'utf8')).toContain('#EXTM3U')
+  })
+
+  it('el original pasa a Procesadas dentro de su misma carpeta', () => {
+    expect(existsSync(path.join(base, 'Procesadas', inFolder))).toBe(true)
+    expect(existsSync(path.join(base, 'Procesadas', named))).toBe(true)
+    expect(existsSync(path.join(base, 'Entrada', inFolder))).toBe(false)
+  })
+
+  it('un episodio que ya existe va a Errores explicando por qué, sin subir nada', async () => {
+    const again = `${showName} - S01E01 - Repetido.mp4`
+    const file = path.join(base, 'Entrada', again)
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine', '-t', '2', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', file])
+    old(file)
+    rmSync(path.join(fakeR2, `series/${showSlug}/s01e01`), { recursive: true })
+    runInbox()
+    runInbox()
+    expect(existsSync(path.join(base, 'Errores', again))).toBe(true)
+    expect(readFileSync(path.join(base, 'Errores', `${again}.log`), 'utf8')).toMatch(/ya existe/)
+    expect(existsSync(path.join(fakeR2, `series/${showSlug}/s01e01`))).toBe(false)
+    const { data } = await adminClient().from('movies').select('id').like('slug', `${showSlug}%`)
+    expect(data).toHaveLength(2)
+  }, 120_000)
 })

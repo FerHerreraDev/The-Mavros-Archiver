@@ -134,6 +134,8 @@ class ViewModelsTest {
                 return FakeCatalogRepository().catalogResult
             }
             override suspend fun movie(id: String): DataResult<MovieDetail?> = DataResult.Success(null)
+            override suspend fun series(id: String) = DataResult.Success(null)
+            override suspend fun nextEpisode(movieId: String) = DataResult.Success(null)
         }
         val vm = CatalogViewModel(repo)
         val seen = mutableListOf<CatalogUiState>()

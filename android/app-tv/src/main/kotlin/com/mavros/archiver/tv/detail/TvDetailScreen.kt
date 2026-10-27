@@ -63,6 +63,8 @@ private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit) {
             PosterImage(movie, Modifier.fillMaxSize()) {}
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Episodio: su serie y "T1:E2" (SER-12)
+            detail.series?.let { Text("${it.title} · ${movie.episodeTag}", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("tv-series-line")) }
             Text(movie.title, style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold), color = MavrosColors.Foreground, modifier = Modifier.testTag("tv-title"))
             movie.originalTitle?.let { Text(it, color = MavrosColors.MutedForeground) }
             Text(

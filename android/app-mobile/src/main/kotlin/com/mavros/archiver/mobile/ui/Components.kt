@@ -39,18 +39,34 @@ import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.design.PosterImage
 import com.mavros.archiver.core.design.MonoLabel
+import com.mavros.archiver.core.model.HasPoster
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.formatDurationShort
 
 /** Póster 2:3 con vista previa ThumbHash (LOAD-02), placeholder si no hay imagen y barra de progreso opcional (MOB-07) */
 @Composable
-fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier, progress: Float? = null) {
+fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier, progress: Float? = null) =
+    // Compacto para tarjetas angostas: "2026 · 1h 39m" cabe en 120 dp sin cortar la duración
+    PosterCard(movie, movie.title, listOfNotNull(movie.releaseYear?.toString(), formatDurationShort(movie.durationSeconds)).joinToString(" · "), onClick, modifier, progress)
+
+/** Tarjeta de póster de película, serie o episodio (SER-08, SER-11): título y una línea de datos */
+@Composable
+fun PosterCard(
+    poster: HasPoster,
+    title: String,
+    meta: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    /** Lo que abre la tarjeta (un episodio lleva el póster de su serie pero abre el episodio) */
+    tagId: String = poster.id,
+) {
     // Sin clip en la tarjeta completa: la esquina redondeada mordía el texto de abajo (solo se redondea el póster)
     Column(
         modifier
-            .clickable(onClickLabel = "Ver ${movie.title}", onClick = onClick)
-            .semantics { contentDescription = "Ver ${movie.title}" }
-            .testTag("poster-${movie.id}"),
+            .clickable(onClickLabel = "Ver $title", onClick = onClick)
+            .semantics { contentDescription = "Ver $title" }
+            .testTag("poster-$tagId"),
     ) {
         Box(
             Modifier
@@ -60,11 +76,11 @@ fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier,
                 .background(MavrosColors.Card)
                 .border(1.dp, MavrosColors.Border, RoundedCornerShape(12.dp)),
         ) {
-            PosterImage(movie, Modifier.fillMaxSize()) {
-                Column(Modifier.fillMaxSize().padding(12.dp).testTag("poster-fallback-${movie.id}"), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            PosterImage(poster, Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().padding(12.dp).testTag("poster-fallback-$tagId"), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Outlined.Movie, contentDescription = null, tint = MavrosColors.MutedForeground)
                     Spacer(Modifier.height(8.dp))
-                    Text(movie.title, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (progress != null) {
@@ -75,22 +91,21 @@ fun PosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier,
                         .height(4.dp)
                         .background(MavrosColors.Background.copy(alpha = 0.6f))
                         .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) }
-                        .testTag("progress-${movie.id}"),
+                        .testTag("progress-$tagId"),
                 ) {
                     Box(Modifier.fillMaxWidth(progress).height(4.dp).background(MavrosColors.Accent))
                 }
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text(movie.title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), maxLines = 2, overflow = TextOverflow.Ellipsis)
-        // Compacto para tarjetas angostas: "2026 · 1h 39m" cabe en 120 dp sin cortar la duración
+        Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(
-            listOfNotNull(movie.releaseYear?.toString(), formatDurationShort(movie.durationSeconds)).joinToString(" · "),
+            meta,
             style = MonoLabel.copy(letterSpacing = 0.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.testTag("meta-${movie.id}"),
+            modifier = Modifier.testTag("meta-$tagId"),
         )
     }
 }

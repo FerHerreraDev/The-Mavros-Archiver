@@ -16,6 +16,8 @@ import com.mavros.archiver.core.data.DeviceTokens
 import com.mavros.archiver.core.data.LoginError
 import com.mavros.archiver.core.data.SessionState
 import com.mavros.archiver.core.model.Catalog
+import com.mavros.archiver.core.model.CatalogSeries
+import com.mavros.archiver.core.model.Series
 import com.mavros.archiver.core.model.ContinueItem
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.tv.catalog.tvRows
@@ -182,10 +184,38 @@ class TvRowsTest {
         val a = movie("a", genres = listOf("anime")); val b = movie("b", genres = listOf("acción", "anime")); val c = movie("c")
         val rows = tvRows(Catalog(genres = listOf("acción", "anime", "terror"), recent = listOf(a, b, c), continueWatching = listOf(ContinueItem(b, 3000.0))))
         assertEquals(listOf("Seguir viendo", "Recién agregadas", "Acción", "Anime"), rows.map { it.title })
-        assertEquals(listOf("b"), rows[0].movies.map { it.id })
-        assertEquals(0.5f, rows[0].progress["b"])
-        assertEquals(listOf("a", "b"), rows[3].movies.map { it.id })
+        assertEquals(listOf("b"), rows[0].items.map { it.id })
+        assertEquals(0.5f, rows[0].items[0].progress)
+        assertEquals(listOf("a", "b"), rows[3].items.map { it.id })
         assertTrue(tvRows(Catalog(emptyList(), emptyList(), emptyList())).isEmpty())
+    }
+
+    @Test fun `SER-15 fila Series despues de recien agregadas, series en su genero y episodio en seguir viendo`() {
+        val a = movie("a", genres = listOf("drama"))
+        val show = Series(id = "s", slug = "s", title = "Breaking Bad", releaseYear = 2008, genres = listOf("drama"))
+        val ep = Movie(id = "e2", slug = "e2", title = "El gato", durationSeconds = 1000, seriesId = "s", seasonNumber = 1, episodeNumber = 2)
+        val rows = tvRows(
+            Catalog(
+                genres = listOf("drama"),
+                recent = listOf(a),
+                continueWatching = listOf(ContinueItem(ep, 0.0, show)),
+                series = listOf(CatalogSeries(show, 2, 10)),
+            ),
+        )
+        assertEquals(listOf("Seguir viendo", "Recién agregadas", "Series", "Drama"), rows.map { it.title })
+        // El episodio abre el episodio pero se ve con el póster y título de su serie
+        val continueItem = rows[0].items.single()
+        assertEquals("e2", continueItem.id)
+        assertEquals("Breaking Bad", continueItem.title)
+        assertEquals("T1:E2 · El gato", continueItem.meta)
+        assertEquals(false, continueItem.isSeries)
+        val seriesItem = rows[2].items.single()
+        assertEquals("s", seriesItem.id)
+        assertEquals("2008 · 2 temporadas", seriesItem.meta)
+        assertTrue(seriesItem.isSeries)
+        assertEquals(listOf("a", "s"), rows[3].items.map { it.id })
+        // Solo series: no hay "Recién agregadas" vacía
+        assertEquals(listOf("Series", "Drama"), tvRows(Catalog(listOf("drama"), emptyList(), emptyList(), listOf(CatalogSeries(show, 1, 1)))).map { it.title })
     }
 }
 

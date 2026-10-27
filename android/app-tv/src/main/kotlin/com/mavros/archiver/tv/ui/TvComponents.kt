@@ -35,6 +35,7 @@ import com.mavros.archiver.core.design.MonoLabel
 import com.mavros.archiver.core.design.PosterImage
 import com.mavros.archiver.core.design.ShimmerHost
 import com.mavros.archiver.core.design.skeleton
+import com.mavros.archiver.core.model.HasPoster
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.formatDurationShort
 
@@ -46,7 +47,21 @@ private val PosterShape = RoundedCornerShape(12.dp)
  * Debajo, título y año · duración.
  */
 @Composable
-fun TvPosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier, progress: Float? = null) {
+fun TvPosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifier, progress: Float? = null) =
+    TvPosterCard(movie, movie.title, listOfNotNull(movie.releaseYear?.toString(), formatDurationShort(movie.durationSeconds)).joinToString(" · "), onClick, modifier, progress)
+
+/** Póster de película, serie o episodio (SER-15) con título y una línea de datos */
+@Composable
+fun TvPosterCard(
+    poster: HasPoster,
+    title: String,
+    meta: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    /** Lo que abre la tarjeta (un episodio lleva el póster de su serie pero abre el episodio) */
+    tagId: String = poster.id,
+) {
     Column(modifier.width(TvCardWidth)) {
         Card(
             onClick = onClick,
@@ -54,19 +69,19 @@ fun TvPosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifie
             scale = CardDefaults.scale(focusedScale = 1.1f),
             border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, MavrosColors.Accent), shape = PosterShape)),
             colors = CardDefaults.colors(containerColor = MavrosColors.Card),
-            modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).testTag("tv-card-${movie.id}"),
+            modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).testTag("tv-card-$tagId"),
         ) {
             Box(Modifier.fillMaxSize()) {
-                PosterImage(movie, Modifier.fillMaxSize()) {
+                PosterImage(poster, Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-                        Text(movie.title, textAlign = TextAlign.Center, color = MavrosColors.Foreground, maxLines = 4)
+                        Text(title, textAlign = TextAlign.Center, color = MavrosColors.Foreground, maxLines = 4)
                     }
                 }
                 if (progress != null) {
                     Box(
                         Modifier.align(Alignment.BottomStart).fillMaxWidth().height(5.dp).background(MavrosColors.Background.copy(alpha = 0.6f))
                             .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) }
-                            .testTag("tv-progress-${movie.id}"),
+                            .testTag("tv-progress-$tagId"),
                     ) {
                         Box(Modifier.fillMaxWidth(progress).height(5.dp).background(MavrosColors.Accent))
                     }
@@ -75,13 +90,8 @@ fun TvPosterCard(movie: Movie, onClick: () -> Unit, modifier: Modifier = Modifie
         }
         // El póster enfocado crece 10 % (≈12 dp hacia abajo): el título no debe quedar tapado
         Spacer(Modifier.height(20.dp))
-        Text(movie.title, color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            listOfNotNull(movie.releaseYear?.toString(), formatDurationShort(movie.durationSeconds)).joinToString(" · "),
-            style = MonoLabel,
-            color = MavrosColors.MutedForeground,
-            maxLines = 1,
-        )
+        Text(title, color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+        Text(meta, style = MonoLabel, color = MavrosColors.MutedForeground, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

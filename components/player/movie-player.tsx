@@ -1,7 +1,8 @@
 'use client'
 
 import '@videojs/react/video/skin.css'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { VideoPlayer, VideoSkin } from '@videojs/react/video'
 import { HlsJsVideo, type HlsJsAdapter, type HlsSource } from '@videojs/react/media/hlsjs-video'
 import { createClient } from '@/lib/supabase/client'
@@ -18,11 +19,15 @@ type Props = {
   initialUrl: string
   initialExpiresAt: string
   startAt: number
+  /** Episodio siguiente (SER-12): al terminar se ofrece con cuenta regresiva */
+  next?: { slug: string; title: string; label: string } | null
 }
+
+const NEXT_COUNTDOWN_SECONDS = 10
 
 type HlsErrorData = { fatal?: boolean; response?: { code?: number }; networkDetails?: { status?: number } }
 
-export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpiresAt, startAt }: Props) {
+export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpiresAt, startAt, next }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaRef = useRef<HlsJsAdapter>(null)
   const latestUrl = useRef(initialUrl)
@@ -31,6 +36,7 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
   const lastSaved = useRef<number | null>(null)
   const resumed = useRef(false)
   const supabase = useMemo(() => createClient(), [])
+  const [showNext, setShowNext] = useState(false)
 
   // --- Token --------------------------------------------------------------
   const scheduleRefresh = useCallback((expiresAt: string) => {
@@ -133,30 +139,86 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
   }, [save])
 
   return (
-    <VideoPlayer title={title} poster={poster ?? undefined}>
-      <VideoSkin className="w-full overflow-hidden rounded-2xl border border-border bg-black" style={{ aspectRatio: '16 / 9' }}>
-        <HlsJsVideo
-          ref={videoRef}
-          mediaRef={mediaRef}
-          source={source}
-          playsInline
-          preload="metadata"
-          data-testid="movie-video"
-          onLoadedMetadata={() => {
-            // PRG-02: retomar una sola vez, al cargar
-            if (!resumed.current && startAt > 0 && videoRef.current) {
-              videoRef.current.currentTime = startAt
-            }
-            resumed.current = true
-          }}
-          onTimeUpdate={() => {
-            const t = videoRef.current?.currentTime ?? 0
-            if (lastSaved.current === null || Math.abs(t - lastSaved.current) >= SAVE_EVERY_SECONDS) void save(t)
-          }}
-          onPause={() => void save(videoRef.current?.currentTime ?? 0)}
-          onEnded={() => void save(videoRef.current?.duration ?? 0)}
-        />
-      </VideoSkin>
-    </VideoPlayer>
+    <div className="relative">
+      <VideoPlayer title={title} poster={poster ?? undefined}>
+        <VideoSkin className="w-full overflow-hidden rounded-2xl border border-border bg-black" style={{ aspectRatio: '16 / 9' }}>
+          <HlsJsVideo
+            ref={videoRef}
+            mediaRef={mediaRef}
+            source={source}
+            playsInline
+            preload="metadata"
+            data-testid="movie-video"
+            onLoadedMetadata={() => {
+              // PRG-02: retomar una sola vez, al cargar
+              if (!resumed.current && startAt > 0 && videoRef.current) {
+                videoRef.current.currentTime = startAt
+              }
+              resumed.current = true
+            }}
+            onTimeUpdate={() => {
+              const t = videoRef.current?.currentTime ?? 0
+              if (lastSaved.current === null || Math.abs(t - lastSaved.current) >= SAVE_EVERY_SECONDS) void save(t)
+            }}
+            onPause={() => void save(videoRef.current?.currentTime ?? 0)}
+            onEnded={() => {
+              void save(videoRef.current?.duration ?? 0)
+              if (next) setShowNext(true)
+            }}
+            onPlay={() => setShowNext(false)}
+          />
+          {/* Dentro del skin: sigue visible en pantalla completa */}
+          {next && showNext && <NextEpisode next={next} onCancel={() => setShowNext(false)} />}
+        </VideoSkin>
+      </VideoPlayer>
+    </div>
+  )
+}
+
+/** "Siguiente episodio en 10 s" con Ver ahora / Cancelar (SER-12) */
+function NextEpisode({ next, onCancel }: { next: NonNullable<Props['next']>; onCancel: () => void }) {
+  const router = useRouter()
+  const [left, setLeft] = useState(NEXT_COUNTDOWN_SECONDS)
+  const href = `/dashboard/watch/${next.slug}`
+
+  useEffect(() => {
+    if (left <= 0) {
+      router.push(href)
+      return
+    }
+    const timer = setTimeout(() => setLeft((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [left, href, router])
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Siguiente episodio"
+      className="absolute bottom-16 right-4 z-10 w-72 space-y-3 rounded-2xl border border-border bg-black/85 p-4 backdrop-blur"
+    >
+      <div>
+        <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground">Siguiente episodio en {left} s</p>
+        <p className="mt-1 text-sm font-medium text-foreground line-clamp-2">
+          {next.label} · {next.title}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          autoFocus
+          onClick={() => router.push(href)}
+          className="flex-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          Ver ahora
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
   )
 }

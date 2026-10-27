@@ -25,12 +25,15 @@ import com.mavros.archiver.core.android.detail.DetailViewModel
 import com.mavros.archiver.mobile.login.LoginScreen
 import com.mavros.archiver.mobile.login.LoginViewModel
 import com.mavros.archiver.mobile.profile.ProfileScreen
+import com.mavros.archiver.mobile.series.SeriesScreen
+import com.mavros.archiver.core.android.series.SeriesViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable data object CatalogRoute
 @Serializable data class DetailRoute(val movieId: String)
 @Serializable data object ProfileRoute
+@Serializable data class SeriesRoute(val seriesId: String)
 
 /**
  * Sin sesión solo existe el login; con sesión, catálogo/detalle/perfil.
@@ -60,6 +63,17 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 viewModel = vm,
                 onOpenMovie = { nav.navigate(DetailRoute(it)) },
                 onOpenProfile = { nav.navigate(ProfileRoute) },
+                onOpenSeries = { nav.navigate(SeriesRoute(it)) },
+            )
+        }
+        composable<SeriesRoute> { entry ->
+            val context = LocalContext.current
+            val seriesId = entry.toRoute<SeriesRoute>().seriesId
+            val vm: SeriesViewModel = viewModel(key = seriesId, factory = viewModelFactory { initializer { SeriesViewModel(container.catalog, seriesId, container.progress) } })
+            SeriesScreen(
+                viewModel = vm,
+                onBack = { nav.popBackStack() },
+                onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
             )
         }
         composable<DetailRoute> { entry ->

@@ -4,13 +4,14 @@ import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/guards'
-import { movieFormSchema } from '@/lib/movies'
+import { episodeSlug, movieFormSchema } from '@/lib/movies'
 import { probeHlsMaster } from '@/lib/hls/remote'
 import { signedVideoBase } from '@/lib/video/playback'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { processPoster, uploadPoster } from '@/lib/poster/thumbhash'
 
 const MOVIES_PATH = '/dashboard/admin/movies'
+const SERIES_PATH = '/dashboard/admin/series'
 const DENIED = 'Acceso denegado. Se requieren privilegios de administrador.'
 
 export type MovieActionResult = {
@@ -19,7 +20,7 @@ export type MovieActionResult = {
   fieldErrors?: Partial<Record<string, string[]>>
 }
 
-const FIELDS = ['title', 'slug', 'original_title', 'synopsis', 'release_year', 'genres', 'poster_url', 'hls_path'] as const
+const FIELDS = ['title', 'slug', 'original_title', 'synopsis', 'release_year', 'genres', 'poster_url', 'hls_path', 'series_id', 'season_number', 'episode_number'] as const
 const IdSchema = z.uuid()
 
 /**
@@ -31,6 +32,14 @@ async function prepare(formData: FormData, supabase: SupabaseClient) {
   const parsed = movieFormSchema.safeParse(raw)
   if (!parsed.success) {
     return { result: { error: 'Revisa los campos marcados.', fieldErrors: z.flattenError(parsed.error).fieldErrors } }
+  }
+
+  // Episodio sin slug escrito: "<serie>-s01e02" en vez del título (que se repite entre series: "Piloto")
+  const { series_id, season_number, episode_number } = parsed.data
+  if (series_id !== null) {
+    const { data: series } = await supabase.from('series').select('slug').eq('id', series_id).maybeSingle()
+    if (!series) return { result: { error: 'Revisa los campos marcados.', fieldErrors: { series_id: ['La serie no existe'] } } }
+    if (raw.slug.trim() === '') parsed.data.slug = episodeSlug(series.slug, season_number!, episode_number!)
   }
 
   // El bucket es privado: se verifica a través del Worker con un token corto (PLY-09)
@@ -56,6 +65,9 @@ async function prepare(formData: FormData, supabase: SupabaseClient) {
 }
 
 function dbError(error: { code?: string; message: string }): MovieActionResult {
+  if (error.code === '23505' && error.message.includes('movies_episode_unique')) {
+    return { error: 'Revisa los campos marcados.', fieldErrors: { episode_number: ['Ese episodio ya existe en la serie'] } }
+  }
   if (error.code === '23505') {
     return { error: 'Ya existe una película con ese slug.', fieldErrors: { slug: ['Ya existe una película con ese slug'] } }
   }
@@ -75,6 +87,7 @@ export async function createMovieAction(formData: FormData): Promise<MovieAction
   if (error) return dbError(error)
 
   revalidatePath(MOVIES_PATH)
+  revalidatePath(SERIES_PATH, 'layout')
   redirect(MOVIES_PATH)
 }
 
@@ -91,6 +104,7 @@ export async function updateMovieAction(id: string, formData: FormData): Promise
   if (!data?.length) return { error: 'Película no encontrada.' }
 
   revalidatePath(MOVIES_PATH)
+  revalidatePath(SERIES_PATH, 'layout')
   redirect(MOVIES_PATH)
 }
 
@@ -110,6 +124,7 @@ export async function setMovieStatusAction(input: { id: string; status: string }
   if (!data?.length) return { error: 'Película no encontrada.' }
 
   revalidatePath(MOVIES_PATH)
+  revalidatePath(SERIES_PATH, 'layout')
   return { success: `"${data[0].title}" ${parsed.data.status === 'published' ? 'publicada' : 'pasó a borrador'}.` }
 }
 
@@ -124,5 +139,6 @@ export async function deleteMovieAction(input: { id: string }): Promise<MovieAct
   if (!data?.length) return { error: 'Película no encontrada.' }
 
   revalidatePath(MOVIES_PATH)
+  revalidatePath(SERIES_PATH, 'layout')
   return { success: `"${data[0].title}" borrada.` }
 }

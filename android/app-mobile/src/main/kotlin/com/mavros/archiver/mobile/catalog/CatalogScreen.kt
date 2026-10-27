@@ -54,14 +54,14 @@ import com.mavros.archiver.mobile.ui.CatalogSkeleton
 import com.mavros.archiver.mobile.ui.PosterCard
 
 @Composable
-fun CatalogScreen(viewModel: CatalogViewModel, onOpenMovie: (String) -> Unit, onOpenProfile: () -> Unit) {
+fun CatalogScreen(viewModel: CatalogViewModel, onOpenMovie: (String) -> Unit, onOpenProfile: () -> Unit, onOpenSeries: (String) -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Al regresar a esta pantalla, "Seguir viendo" se actualiza
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose { }
     }
-    CatalogContent(state, onOpenMovie, onOpenProfile, viewModel::selectGenre, viewModel::retry)
+    CatalogContent(state, onOpenMovie, onOpenProfile, viewModel::selectGenre, viewModel::retry, onOpenSeries)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +72,7 @@ fun CatalogContent(
     onOpenProfile: () -> Unit,
     onSelectGenre: (String?) -> Unit,
     onRetry: () -> Unit,
+    onOpenSeries: (String) -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -97,7 +98,7 @@ fun CatalogContent(
             // Mismo padding que CatalogGrid: lo aplica la cuadrícula, no el contenedor
             CatalogUiState.Loading -> CatalogSkeleton(padding)
             is CatalogUiState.Error -> ErrorState(state.error, onRetry, Modifier.padding(padding))
-            is CatalogUiState.Content -> CatalogGrid(state.catalog, state.genre, padding, onOpenMovie, onSelectGenre)
+            is CatalogUiState.Content -> CatalogGrid(state.catalog, state.genre, padding, onOpenMovie, onSelectGenre, onOpenSeries)
         }
     }
 }
@@ -109,6 +110,7 @@ private fun CatalogGrid(
     padding: PaddingValues,
     onOpenMovie: (String) -> Unit,
     onSelectGenre: (String?) -> Unit,
+    onOpenSeries: (String) -> Unit,
 ) {
     val full: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
     LazyVerticalGrid(
@@ -123,12 +125,22 @@ private fun CatalogGrid(
             item(span = full) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.testTag("continue-row")) {
                     items(catalog.continueWatching, key = { it.movie.id }) { item ->
-                        PosterCard(
-                            movie = item.movie,
-                            onClick = { onOpenMovie(item.movie.id) },
-                            progress = ProgressRules.progressRatio(item.positionSeconds, item.movie.durationSeconds),
-                            modifier = Modifier.width(120.dp),
-                        )
+                        val progress = ProgressRules.progressRatio(item.positionSeconds, item.movie.durationSeconds)
+                        val series = item.series
+                        if (series != null) {
+                            // Episodio: título de la serie y "T1:E5 · título" (SER-11)
+                            PosterCard(
+                                poster = series,
+                                title = series.title,
+                                meta = "${item.movie.episodeTag} · ${item.movie.title}",
+                                onClick = { onOpenMovie(item.movie.id) },
+                                progress = progress,
+                                modifier = Modifier.width(120.dp),
+                                tagId = item.movie.id,
+                            )
+                        } else {
+                            PosterCard(movie = item.movie, onClick = { onOpenMovie(item.movie.id) }, progress = progress, modifier = Modifier.width(120.dp))
+                        }
                     }
                 }
             }
@@ -145,7 +157,7 @@ private fun CatalogGrid(
             }
         }
 
-        if (catalog.recent.isEmpty()) {
+        if (catalog.recent.isEmpty() && catalog.series.isEmpty()) {
             item(span = full) {
                 Column(Modifier.padding(vertical = 48.dp).testTag("empty"), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Outlined.Movie, contentDescription = null, tint = MavrosColors.MutedForeground)
@@ -158,6 +170,18 @@ private fun CatalogGrid(
             }
         } else {
             items(catalog.recent, key = { it.id }) { movie -> PosterCard(movie, onClick = { onOpenMovie(movie.id) }) }
+        }
+
+        if (catalog.series.isNotEmpty()) {
+            item(span = full) { SectionTitle("Series") }
+            items(catalog.series, key = { "series-${it.series.id}" }) { show ->
+                PosterCard(
+                    poster = show.series,
+                    title = show.series.title,
+                    meta = listOfNotNull(show.series.releaseYear?.toString(), show.countLabel).joinToString(" · "),
+                    onClick = { onOpenSeries(show.series.id) },
+                )
+            }
         }
     }
 }

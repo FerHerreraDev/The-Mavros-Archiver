@@ -12,6 +12,8 @@ import com.mavros.archiver.core.model.Catalog
 import com.mavros.archiver.core.model.ContinueItem
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.core.model.MovieDetail
+import com.mavros.archiver.core.model.Series
+import com.mavros.archiver.core.model.SeriesDetail
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -74,7 +76,20 @@ class FakeCatalogRepository : CatalogRepository {
 
     var detailCalls = 0
     override suspend fun movie(id: String): DataResult<MovieDetail?> { detailCalls++; return detailResult }
+
+    var seriesResult: DataResult<SeriesDetail?> = DataResult.Success(null)
+    var seriesCalls = 0
+    override suspend fun series(id: String): DataResult<SeriesDetail?> { seriesCalls++; return seriesResult }
+
+    var nextResult: DataResult<Movie?> = DataResult.Success(null)
+    val nextRequests = mutableListOf<String>()
+    override suspend fun nextEpisode(movieId: String): DataResult<Movie?> { nextRequests += movieId; return nextResult }
 }
+
+fun series(id: String = "s", title: String = "Serie $id") = Series(id = id, slug = "serie-$id", title = title, releaseYear = 2008, genres = listOf("drama"))
+
+fun episode(id: String, season: Int, number: Int, title: String = "Episodio $number", duration: Int = 1000, seriesId: String = "s") =
+    Movie(id = id, slug = "ep-$id", title = title, durationSeconds = duration, seriesId = seriesId, seasonNumber = season, episodeNumber = number)
 
 class FakePlaybackRepository(var result: DataResult<PlaybackSource?> = DataResult.Success(PlaybackSource("https://cdn.test/t/T/movies/x/master.m3u8", 0L))) : PlaybackRepository {
     var calls = 0

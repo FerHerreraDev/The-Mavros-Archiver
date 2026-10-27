@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Save } from 'lucide-react'
 import type { MovieActionResult } from '@/lib/actions/movie.actions'
 import type { Movie } from '@/lib/movies'
+import type { SeriesOption } from '@/lib/data/series'
 
 import { Button } from '@/components/ui/button'
 import { LinkPendingIcon } from '@/components/ui/link-pending'
@@ -15,13 +16,22 @@ import { Label } from '@/components/ui/label'
 const LABEL = 'text-xs font-mono uppercase tracking-wide text-muted-foreground'
 const FIELD = 'bg-card rounded-lg h-auto py-2'
 
+const SELECT =
+  'w-full rounded-lg border border-field bg-card px-3 py-2 text-sm [color-scheme:dark] focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/40'
+
 type Props = {
   action: (formData: FormData) => Promise<MovieActionResult>
-  movie?: Movie
+  movie?: Partial<Movie>
   submitLabel: string
+  /** false = formulario de serie: sin video (SER-05) */
+  video?: boolean
+  /** Con opciones se puede marcar como episodio de una serie (SER-06) */
+  seriesOptions?: SeriesOption[]
+  cancelHref?: string
 }
 
-export function MovieForm({ action, movie, submitLabel }: Props) {
+export function MovieForm({ action, movie, submitLabel, video = true, seriesOptions, cancelHref = '/dashboard/admin/movies' }: Props) {
+  const [seriesId, setSeriesId] = useState(movie?.series_id ?? '')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<MovieActionResult['fieldErrors']>({})
@@ -104,10 +114,40 @@ export function MovieForm({ action, movie, submitLabel }: Props) {
             />
           )}
         </div>
+        {seriesOptions && seriesOptions.length > 0 && (
+          <div className="md:col-span-2 grid gap-6 sm:grid-cols-3">
+            {field(
+              'series_id',
+              'Serie',
+              <select {...inputProps('series_id')} value={seriesId} onChange={(e) => setSeriesId(e.target.value)} className={SELECT}>
+                <option value="">Ninguna (película)</option>
+                {seriesOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>,
+              seriesId ? 'Slug vacío = <serie>-s01e02.' : undefined
+            )}
+            {seriesId &&
+              field(
+                'season_number',
+                'Temporada',
+                <Input {...inputProps('season_number')} type="number" inputMode="numeric" min={0} max={999} defaultValue={movie?.season_number ?? ''} required className={FIELD} />,
+                '0 = especiales'
+              )}
+            {seriesId &&
+              field(
+                'episode_number',
+                'Episodio',
+                <Input {...inputProps('episode_number')} type="number" inputMode="numeric" min={1} max={9999} defaultValue={movie?.episode_number ?? ''} required className={FIELD} />
+              )}
+          </div>
+        )}
         {field(
           'genres',
           'Géneros',
-          <Input {...inputProps('genres')} defaultValue={movie?.genres.join(', ')} placeholder="anime, acción, romance" className={FIELD} />,
+          <Input {...inputProps('genres')} defaultValue={movie?.genres?.join(', ')} placeholder="anime, acción, romance" className={FIELD} />,
           'Separados por comas.'
         )}
         {field(
@@ -115,30 +155,32 @@ export function MovieForm({ action, movie, submitLabel }: Props) {
           'Póster (URL)',
           <Input {...inputProps('poster_url')} type="url" defaultValue={movie?.poster_url ?? ''} placeholder="https://…" className={FIELD} />
         )}
-        <div className="md:col-span-2">
-          {field(
-            'hls_path',
-            'Video (ruta en R2)',
-            <Input
-              {...inputProps('hls_path')}
-              defaultValue={movie?.hls_path}
-              required
-              placeholder="movies/mi-pelicula/master.m3u8"
-              className={`${FIELD} font-mono`}
-            />,
-            'Ruta del master.m3u8 dentro del bucket. Se verifica antes de guardar y la duración se toma de ahí.'
-          )}
-        </div>
+        {video && (
+          <div className="md:col-span-2">
+            {field(
+              'hls_path',
+              'Video (ruta en R2)',
+              <Input
+                {...inputProps('hls_path')}
+                defaultValue={movie?.hls_path}
+                required
+                placeholder="movies/mi-pelicula/master.m3u8"
+                className={`${FIELD} font-mono`}
+              />,
+              'Ruta del master.m3u8 dentro del bucket. Se verifica antes de guardar y la duración se toma de ahí.'
+            )}
+          </div>
+        )}
       </fieldset>
 
       <div className="flex items-center justify-end gap-3">
-        <Link href="/dashboard/admin/movies" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link href={cancelHref} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <LinkPendingIcon>{null}</LinkPendingIcon>
           Cancelar
         </Link>
         <Button type="submit" disabled={isPending} className="rounded-full font-semibold py-5 px-6">
           {isPending ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {isPending ? 'Verificando video…' : submitLabel}
+          {isPending ? (video ? 'Verificando video…' : 'Guardando…') : submitLabel}
         </Button>
       </div>
     </form>

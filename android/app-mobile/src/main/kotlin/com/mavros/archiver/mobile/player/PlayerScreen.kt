@@ -34,7 +34,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import com.mavros.archiver.core.data.DataError
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.design.MavrosLoader
+import com.mavros.archiver.core.android.player.NEXT_EPISODE_COUNTDOWN_SECONDS
+import com.mavros.archiver.core.model.Movie
+import kotlinx.coroutines.delay
 
 /**
  * Pantalla del reproductor (MOB-13, MOB-14). [video] es la superficie de Media3 (PlayerView);
@@ -70,6 +75,9 @@ fun PlayerScreen(
     onSelectQuality: (Int?) -> Unit,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    nextEpisode: Movie? = null,
+    onPlayNext: (Movie) -> Unit = {},
+    onCancelNext: () -> Unit = {},
     video: @Composable () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -95,6 +103,38 @@ fun PlayerScreen(
             modifier = Modifier.align(Alignment.TopStart),
         ) {
             TopBar(title, state is PlayerUiState.Ready && qualities.size > 1, qualities, selectedQuality, onSelectQuality, onBack)
+        }
+
+        nextEpisode?.let { NextEpisodeCard(it, onPlayNext, onCancelNext, Modifier.align(Alignment.BottomEnd)) }
+    }
+}
+
+/** "Siguiente episodio en 10 s" con Ver ahora / Cancelar (SER-16) */
+@Composable
+fun NextEpisodeCard(next: Movie, onPlay: (Movie) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    var left by remember(next.id) { mutableIntStateOf(NEXT_EPISODE_COUNTDOWN_SECONDS) }
+    LaunchedEffect(next.id) {
+        while (left > 0) {
+            delay(1_000)
+            left--
+        }
+        onPlay(next)
+    }
+    Column(
+        modifier
+            .safeDrawingPadding()
+            .padding(24.dp)
+            .width(300.dp)
+            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+            .testTag("next-episode"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Siguiente episodio en $left s", color = MavrosColors.MutedForeground, style = MaterialTheme.typography.labelMedium, modifier = Modifier.testTag("next-countdown"))
+        Text("${next.episodeTag} · ${next.title}", color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onPlay(next) }, shape = RoundedCornerShape(999.dp), modifier = Modifier.weight(1f).testTag("next-now")) { Text("Ver ahora") }
+            TextButton(onClick = onCancel, modifier = Modifier.testTag("next-cancel")) { Text("Cancelar") }
         }
     }
 }

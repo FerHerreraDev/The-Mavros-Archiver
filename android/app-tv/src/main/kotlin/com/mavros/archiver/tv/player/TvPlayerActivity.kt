@@ -97,7 +97,16 @@ class TvPlayerActivity : ComponentActivity() {
 
     private lateinit var session: PlaybackSession
     private lateinit var player: ExoPlayer
-    private var started = false
+    /** Película/episodio que ya arrancó en el reproductor */
+    private var startedId: String? = null
+    private var ended by mutableStateOf(false)
+    private var nextCancelled by mutableStateOf(false)
+    /** "Siguiente episodio" en pantalla: las teclas son de sus botones (SER-16) */
+    private var nextVisible = false
+
+    /** Lo que se está viendo; cambia al pasar al siguiente episodio sin salir (SER-16) */
+    private data class Current(val id: String, val title: String, val duration: Int, val startAt: Double)
+    private var current by mutableStateOf(Current("", "", 0, 0.0))
     private var buffering by mutableStateOf(true)
     private var failed by mutableStateOf(false)
     private var controlsVisible by mutableStateOf(false)
@@ -114,9 +123,12 @@ class TvPlayerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as TvApplication).container
-        val movieId = intent.getStringExtra(MOVIE_ID).orEmpty()
-        val duration = intent.getIntExtra(DURATION, 0)
-        val startAt = intent.getDoubleExtra(START_AT, 0.0)
+        current = Current(
+            intent.getStringExtra(MOVIE_ID).orEmpty(),
+            intent.getStringExtra(TITLE).orEmpty(),
+            intent.getIntExtra(DURATION, 0),
+            intent.getDoubleExtra(START_AT, 0.0),
+        )
 
         session = PlaybackSession(lifecycleScope, container.appScope, container.playback, container.progress)
         player = session.buildPlayer(this)
@@ -124,6 +136,7 @@ class TvPlayerActivity : ComponentActivity() {
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) failed = false
+                ended = state == Player.STATE_ENDED
             }
             override fun onPlayerError(error: PlaybackException) { failed = true }
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
@@ -135,14 +148,18 @@ class TvPlayerActivity : ComponentActivity() {
 
         setContent {
             MavrosTvTheme {
-                val vm: PlayerViewModel = viewModel(factory = viewModelFactory { initializer { PlayerViewModel(container.playback, movieId) } })
+                val movie = current
+                // Una por película: al pasar al siguiente episodio se pide su propia URL (SER-16)
+                val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory { initializer { PlayerViewModel(container.playback, movie.id, container.catalog) } })
                 val state by vm.state.collectAsStateWithLifecycle()
+                val next by vm.next.collectAsStateWithLifecycle()
                 LaunchedEffect(state) {
                     val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
-                    if (started) return@LaunchedEffect
-                    started = true
-                    session.start(movieId, ready.source.url, ready.source.expiresAtMs, duration)
-                    player.setMediaItem(MediaItem.Builder().setUri(ready.source.url).setMimeType(MimeTypes.APPLICATION_M3U8).build(), (startAt * 1000).toLong())
+                    if (startedId == movie.id) return@LaunchedEffect
+                    startedId = movie.id
+                    // start guarda la salida del episodio anterior y lleva token y progreso de este
+                    session.start(movie.id, ready.source.url, ready.source.expiresAtMs, movie.duration)
+                    player.setMediaItem(MediaItem.Builder().setUri(ready.source.url).setMimeType(MimeTypes.APPLICATION_M3U8).build(), (movie.startAt * 1000).toLong())
                     player.prepare()
                     player.play()
                 }
@@ -185,7 +202,7 @@ class TvPlayerActivity : ComponentActivity() {
                                 }
                                 TvPlayerControls(
                                     visible = controlsVisible,
-                                    title = intent.getStringExtra(TITLE).orEmpty(),
+                                    title = movie.title,
                                     isPlaying = isPlaying,
                                     positionMs = positionMs,
                                     durationMs = durationMs,
@@ -198,6 +215,9 @@ class TvPlayerActivity : ComponentActivity() {
                                     interaction = interaction,
                                     onAutoHide = { controlsVisible = false },
                                 )
+                                val upNext = next?.takeIf { ended && !nextCancelled }
+                                nextVisible = upNext != null
+                                upNext?.let { TvNextEpisode(it, ::playNext, { nextCancelled = true }, Modifier.align(Alignment.BottomEnd)) }
                                 seekHint?.let {
                                     Text(
                                         it,
@@ -217,6 +237,14 @@ class TvPlayerActivity : ComponentActivity() {
 
     /** Control remoto (TV-06): ver [tvPlayerAction] */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (nextVisible) {
+            // Atrás quita el aviso; lo demás es de "Ver ahora" / "Cancelar"
+            if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event.action == KeyEvent.ACTION_UP) nextCancelled = true
+                return true
+            }
+            return super.dispatchKeyEvent(event)
+        }
         val action = tvPlayerAction(event.keyCode, controlsVisible) ?: return super.dispatchKeyEvent(event)
         if (failed && action != TvPlayerAction.Exit) return super.dispatchKeyEvent(event) // "Reintentar" recibe el OK
         interaction++
@@ -232,6 +260,16 @@ class TvPlayerActivity : ComponentActivity() {
             TvPlayerAction.ToControls -> Unit
         }
         return true
+    }
+
+    /** Siguiente episodio sin salir del reproductor (SER-16) */
+    private fun playNext(next: Movie) {
+        ended = false
+        nextCancelled = false
+        controlsVisible = false
+        selectedHeight = null
+        intent = intent(this, next, 0.0)
+        current = Current(next.id, next.title, next.durationSeconds, 0.0)
     }
 
     private fun togglePlay() = if (player.isPlaying) player.pause() else player.play()

@@ -20,6 +20,27 @@ verifica, la sube a R2 y la deja como **borrador** en el admin con título y añ
 - Registro: `~/Library/Logs/mavros-inbox.log`. Para quitar el servicio: `scripts/install-movie-inbox.sh --quitar`.
 - Para correrlo a mano sin esperar: `pnpm movie:inbox`.
 
+### Series
+
+Los episodios se reconocen por `S01E02` (o `1x02`) en el nombre. Sirven cualquiera de estas formas:
+
+```
+Entrada/Breaking Bad (2008)/S01E01 - Pilot.mkv        ← la serie sale de la carpeta
+Entrada/Breaking Bad (2008)/Temporada 2/S02E01.mkv    ← subcarpetas de temporada se ignoran
+Entrada/Breaking Bad - S01E03 - And the Bag's in the River.mkv
+Entrada/Breaking.Bad.S01E04.720p.BluRay.mkv           ← "720p.BluRay…" no se toma como título
+```
+
+- Puedes soltar una temporada completa: se procesa un episodio tras otro.
+- Si la serie no existe se crea como **borrador** (título y año de la carpeta o del nombre). Si ya
+  existe (mismo nombre), el episodio se agrega a ella.
+- Cada episodio queda en borrador con título del archivo (o "Episodio N") y su video en
+  `series/<serie>/s01e02/` en R2.
+- En el admin → **Series** → la serie: ponle póster/sinopsis, **Publicar borradores (N)** para
+  publicar todos los episodios de una vez y **Publicar** la serie. Un episodio solo se ve si él y su
+  serie están publicados.
+- Un episodio que ya existe va a `Errores` sin subir nada.
+
 ## A mano (paso por paso)
 
 Tres pasos en tu Mac: convertir a HLS, subir a R2 y darla de alta en el panel.

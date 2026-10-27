@@ -112,6 +112,10 @@ private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Do
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Episodio: su serie y "T1:E2" (SER-12)
+                detail.series?.let {
+                    Text("${it.title} · ${movie.episodeTag}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("series-line"))
+                }
                 Text(movie.title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.testTag("title"))
                 movie.originalTitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 Text(

@@ -390,3 +390,48 @@ App aparte (`app-tv`) para Google TV / Android TV 9+, con la misma lógica que e
 | LOAD-07 | Al guardar una película con póster, el servidor guarda **una copia optimizada** (WebP, máx. 600 px de ancho, sin agrandar imágenes chicas) en el almacenamiento propio (bucket `posters`) y la película la usa: web y Android cargan esa copia en vez de la URL externa. El nombre del archivo es el hash de su contenido (caché de 1 año). Solo un admin puede subir/borrar archivos ahí; cualquiera con la URL los lee, pero nadie puede listar el bucket. Si algo falla, la película se guarda igual y se usa la URL original. |
 | LOAD-06 | Toda navegación dentro de la app (enlaces del menú, pestañas, géneros, Cancelar…) muestra **al instante** una barra de progreso fina arriba, hasta que la página nueva aparece. Un enlace a la página en la que ya estás no la activa. Con "reducir movimiento" la barra se ve pero no se anima. |
 | UX-01 | Mientras se envía algo (un formulario o un botón de acción), sus campos y **todos** sus botones quedan bloqueados y el botón tocado muestra un indicador girando (anunciado "Cargando…"). Un segundo clic o tap no vuelve a enviar los datos. Aplica a web y Android. |
+
+## Fase S — Series
+
+Una serie agrupa episodios. Cada episodio es un video como una película (misma tabla `movies`, mismo token, mismo progreso y mismo reproductor) con su serie, temporada y número. Las reglas de orden y de "qué sigue" son funciones puras con casos compartidos entre la web y Android (`tests/fixtures/series-cases.json`).
+
+### Base de datos (`series` y episodios)
+
+| ID | Requisito |
+|---|---|
+| SER-01 | `series`: un usuario ve solo las publicadas; un admin ve todas; un anónimo ninguna. Solo un admin crea, edita o borra, desde cualquier cliente (mismas reglas que MOV-01..MOV-04). |
+| SER-02 | Integridad de `series` igual que MOV-05/MOV-06 (sin video ni duración): slug único con formato, título 1–200, año 1888–2100, póster https o vacío, estado `draft`/`published`; `published_at` se fija al publicar y se borra al volver a borrador; `updated_at` se actualiza solo. |
+| SER-03 | Un episodio es una fila de `movies` con `series_id`, `season_number` (0–999; 0 = especiales) y `episode_number` (1–9999): los tres juntos o ninguno. Dos episodios de la misma serie no pueden tener la misma temporada y número. Borrar una serie borra sus episodios (y el progreso de ellos); los archivos en R2 no se tocan. |
+| SER-04 | Un `user` solo ve un episodio si **el episodio y su serie** están publicados: al listar, por id/slug, al pedir `/api/playback/<id>` y al guardar progreso. Un admin ve todos. |
+
+### Panel (`/dashboard/admin/series`)
+
+| ID | Requisito |
+|---|---|
+| SER-05 | El panel tiene la pestaña **Series**: lista con estado y número de episodios; crear y editar con los campos de una película salvo el video (título, slug que se genera solo, título original, sinopsis, año, géneros, póster con vista previa y copia optimizada como LOAD-03/LOAD-07); publicar, despublicar y borrar (pide confirmación y dice cuántos episodios se borran). Mismas reglas de acceso que MOV-12. |
+| SER-06 | El formulario de película permite marcarla como episodio: serie, temporada y episodio. Temporada/episodio repetidos en la misma serie → error en el campo. En la lista de películas cada episodio dice a qué serie pertenece y su "T1:E2". |
+| SER-07 | La página de edición de una serie lista sus episodios en orden (SER-13) con su estado y enlace a editar, y un botón **Publicar borradores (N)** que publica de una vez todos los episodios en borrador de esa serie. |
+
+### Catálogo y página de la serie
+
+| ID | Requisito |
+|---|---|
+| SER-08 | En el catálogo los episodios nunca aparecen sueltos en "Recién agregadas". Las series publicadas con al menos un episodio visible salen en la sección **Series** (la publicada más recientemente primero), con póster, título, año y "N temporadas" (o "N episodios" si es una sola), y llevan a `/dashboard/series/<slug>`. El filtro de género también filtra las series y sus géneros aparecen en los chips. El estado vacío solo sale si no hay ni películas ni series. |
+| SER-09 | `/dashboard/series/<slug>` muestra póster, título, año, géneros y sinopsis; un selector de temporada (si hay más de una) y la lista de episodios en orden con número, título, duración y barra de progreso si va a medias. Una serie en borrador o inexistente → 404 para un `user`; un admin la ve como vista previa. Un `user` solo ve episodios publicados. |
+| SER-10 | Botón principal de la serie (**qué sigue**): sin nada visto → "Reproducir T1:E1" (el primero en orden). Si no, se toma el episodio visto más recientemente: si no está terminado (< 95 %) → ese episodio ("Continuar T1:E4" si `resumePosition` > 0, si no "Reproducir T1:E4"); si está terminado → el siguiente en orden desde el principio ("Reproducir T1:E5"); si era el último → el primero ("Volver a ver T1:E1"). |
+| SER-11 | "Seguir viendo" tiene **a lo más una entrada por serie**: el episodio que da SER-10, solo si va a medias (5 %–95 %) o si es el siguiente de uno terminado (entra con progreso 0). Una serie terminada (último episodio terminado) no aparece. La tarjeta muestra el título de la serie y "T1:E5 · título del episodio" y lleva a ese episodio. Las películas siguen la regla CAT-06. Todo ordenado por la última vez que se vio. |
+| SER-12 | Ver un episodio (`/dashboard/watch/<slug>`): muestra la serie (enlace a su página), "Temporada 1 · Episodio 2" y el título del episodio. Al terminar, si hay siguiente episodio visible aparece **"Siguiente episodio"** con cuenta regresiva de 10 s que lo abre sola (desde el principio, PRG-02), con botones "Ver ahora" y "Cancelar". En el último episodio no aparece. |
+| SER-13 | Orden de episodios: temporada ascendente y episodio ascendente; la temporada 0 (especiales) va al final. "Siguiente" cruza temporadas (último de T1 → T2:E1). Las mismas reglas dan exactamente lo mismo en web y Android (casos compartidos). |
+
+### Carpeta de la Mac (VID-09)
+
+| ID | Requisito |
+|---|---|
+| SER-14 | La carpeta de entrada reconoce episodios por `S01E02` (o `1x02`, sin importar mayúsculas): `Breaking Bad (2008) - S01E02 - Cat's in the Bag.mkv`, `Breaking.Bad.S01E02.mkv` o dentro de una carpeta `Entrada/Breaking Bad (2008)/S01E02.mkv` (si el nombre del archivo no trae la serie, se toma de la primera carpeta; carpetas como `Temporada 1` se ignoran). La serie se busca por slug: si existe se usa; si no, se crea como borrador con título y año. El episodio queda en borrador con slug `<serie>-s01e02`, título del archivo o "Episodio 2" y video en `series/<serie>/s01e02/`. Si ese episodio ya existe va a Errores explicando por qué, sin subir nada. Al terminar, el archivo pasa a Procesadas dentro de su misma carpeta. |
+
+### Android (teléfono y tele)
+
+| ID | Requisito |
+|---|---|
+| SER-15 | Teléfono y tele muestran la sección/fila **Series** (SER-08) y "Seguir viendo" con episodios (SER-11). La pantalla de la serie tiene las temporadas, los episodios (SER-09) y el botón de SER-10. En la tele todo se recorre con el control remoto. |
+| SER-16 | En el reproductor de Android, al terminar un episodio con siguiente aparece "Siguiente episodio" con cuenta regresiva de 10 s, "Ver ahora" (enfocado en la tele) y "Cancelar"; al llegar a 0 o con "Ver ahora" reproduce el siguiente desde el principio sin salir del reproductor, con su propio progreso y token (MOB-15, MOB-16). |

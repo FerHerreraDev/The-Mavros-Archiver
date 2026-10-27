@@ -79,13 +79,19 @@ class PlayerActivity : ComponentActivity() {
     private var playbackFailed by mutableStateOf(false)
     private var videoHeights by mutableStateOf(emptyList<Int>())
     private var selectedHeight by mutableStateOf<Int?>(null)
+    private var ended by mutableStateOf(false)
+    private var nextCancelled by mutableStateOf(false)
 
-    private val movieId get() = intent.getStringExtra(MOVIE_ID).orEmpty()
+    /** Lo que se está viendo; cambia al pasar al siguiente episodio sin salir (SER-16) */
+    private data class Current(val id: String, val title: String, val duration: Int, val startAt: Double)
+    private var current by mutableStateOf(Current("", "", 0, 0.0))
+    private val movieId get() = current.id
 
     private val listener = object : Player.Listener {
         override fun onPlaybackStateChanged(state: Int) {
             buffering = state == Player.STATE_BUFFERING
             if (state == Player.STATE_READY) playbackFailed = false
+            ended = state == Player.STATE_ENDED
         }
         override fun onPlayerError(error: PlaybackException) { playbackFailed = true }
         override fun onTracksChanged(tracks: Tracks) { videoHeights = heightsOf(tracks) }
@@ -101,29 +107,35 @@ class PlayerActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         val container = (application as MavrosApplication).container
-        val title = intent.getStringExtra(TITLE).orEmpty()
-        val duration = intent.getIntExtra(DURATION, 0)
-        val startAt = intent.getDoubleExtra(START_AT, 0.0)
+        current = Current(
+            intent.getStringExtra(MOVIE_ID).orEmpty(),
+            intent.getStringExtra(TITLE).orEmpty(),
+            intent.getIntExtra(DURATION, 0),
+            intent.getDoubleExtra(START_AT, 0.0),
+        )
 
         setContent {
             MavrosTheme {
-                val vm: PlayerViewModel = viewModel(factory = viewModelFactory { initializer { PlayerViewModel(container.playback, movieId) } })
+                val movie = current
+                // Una por película: al pasar al siguiente episodio se pide su propia URL (SER-16)
+                val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory { initializer { PlayerViewModel(container.playback, movie.id, container.catalog) } })
                 val state by vm.state.collectAsStateWithLifecycle()
-                val current = controller
+                val next by vm.next.collectAsStateWithLifecycle()
+                val player = controller
 
                 // Con URL y controlador listos: se arranca (una sola vez por película)
-                LaunchedEffect(state, current) {
+                LaunchedEffect(state, player) {
                     val ready = state as? PlayerUiState.Ready ?: return@LaunchedEffect
-                    current ?: return@LaunchedEffect
-                    if (current.currentMediaItem?.mediaId == movieId && current.playbackState != Player.STATE_IDLE) return@LaunchedEffect
-                    current.setMediaItem(mediaItem(title, duration, ready), (startAt * 1000).toLong())
-                    current.prepare()
-                    current.play()
+                    player ?: return@LaunchedEffect
+                    if (player.currentMediaItem?.mediaId == movie.id && player.playbackState != Player.STATE_IDLE) return@LaunchedEffect
+                    player.setMediaItem(mediaItem(movie.title, movie.duration, ready), (movie.startAt * 1000).toLong())
+                    player.prepare()
+                    player.play()
                 }
 
                 PlayerScreen(
                     state = state,
-                    title = title,
+                    title = movie.title,
                     inPip = inPip,
                     controlsVisible = controlsVisible,
                     buffering = buffering,
@@ -139,6 +151,9 @@ class PlayerActivity : ComponentActivity() {
                             controller?.play()
                         } else vm.retry()
                     },
+                    nextEpisode = next?.takeIf { ended && !nextCancelled && !inPip },
+                    onPlayNext = ::playNext,
+                    onCancelNext = { nextCancelled = true },
                 ) {
                     AndroidView(
                         factory = { context ->
@@ -152,7 +167,7 @@ class PlayerActivity : ComponentActivity() {
                             }
                         },
                         update = { view ->
-                            view.player = current
+                            view.player = player
                             view.useController = !inPip
                         },
                         modifier = Modifier.fillMaxSize().testTag("player-video"),
@@ -162,6 +177,16 @@ class PlayerActivity : ComponentActivity() {
         }
         updatePipParams(false)
         onBackPressedDispatcher.addCallback(this) { leave() }
+    }
+
+    /** Siguiente episodio sin salir del reproductor: su propia URL, token y progreso (SER-16) */
+    private fun playNext(next: Movie) {
+        ended = false
+        nextCancelled = false
+        selectedHeight = null
+        // Si Android recrea la pantalla, sigue en este episodio
+        intent = intent(this, next, 0.0)
+        current = Current(next.id, next.title, next.durationSeconds, 0.0)
     }
 
     /**

@@ -81,3 +81,43 @@ describe('avance de la carpeta de entrada (VID-10)', () => {
     expect(name).not.toMatch(/[/:]/)
   })
 })
+
+import { parseEpisode, episodeSlug } from '../../scripts/movie-inbox-lib.mjs'
+import { episodeSlug as appEpisodeSlug } from '@/lib/movies'
+
+describe('episodios en la carpeta de entrada (SER-14)', () => {
+  const bb = { title: 'Breaking Bad', year: 2008, slug: 'breaking-bad' }
+  const bbNoYear = { ...bb, year: null }
+
+  it.each([
+    ["Breaking Bad (2008) - S01E02 - Cat's in the Bag.mkv", bb, 1, 2, "Cat's in the Bag"],
+    ['Breaking.Bad.S01E02.mkv', bbNoYear, 1, 2, 'Episodio 2'],
+    ['Breaking.Bad.s01e02.720p.BluRay.x264.mkv', bbNoYear, 1, 2, 'Episodio 2'],
+    ['Breaking Bad (2008)/S01E02.mkv', bb, 1, 2, 'Episodio 2'],
+    ['Breaking Bad (2008)/Temporada 1/S01E03 - And the Bag\'s in the River.mkv', bb, 1, 3, "And the Bag's in the River"],
+    ['Breaking Bad/1x07 - A No-Rough-Stuff-Type Deal.mp4', bbNoYear, 1, 7, 'A No-Rough-Stuff-Type Deal'],
+    ['Breaking Bad - S00E01 - Especial.mkv', bbNoYear, 0, 1, 'Especial'],
+  ])('%s → serie, temporada, episodio y título', (file, series, season, episode, title) => {
+    expect(parseEpisode(file)).toEqual({ series, season, episode, title })
+  })
+
+  it('la serie del nombre del archivo manda sobre la carpeta', () => {
+    expect(parseEpisode('Varias/Dark - S01E01.mkv')).toMatchObject({ series: { title: 'Dark', slug: 'dark' } })
+  })
+
+  it('sin S01E02 ni 1x02 no es episodio (película)', () => {
+    for (const f of ['Perfect Blue (1997).mkv', 'Peliculas/Akira (1988).mkv', '2001 A Space Odyssey.mkv']) expect(parseEpisode(f)).toBeNull()
+  })
+
+  it('sin nombre de serie ni carpeta → error claro', () => {
+    expect(parseEpisode('S01E02.mkv')).toEqual({ error: expect.stringMatching(/de qué serie/) })
+  })
+
+  it('el slug del episodio es el mismo que genera la app', () => {
+    expect(episodeSlug('breaking-bad', 1, 2)).toBe('breaking-bad-s01e02')
+    expect(episodeSlug('x', 12, 105)).toBe('x-s12e105')
+    for (const [s, a, b] of [['breaking-bad', 1, 2], ['y'.repeat(100), 3, 4], ['a-', 0, 1]] as const) {
+      expect(episodeSlug(s, a, b)).toBe(appEpisodeSlug(s, a, b))
+    }
+  })
+})

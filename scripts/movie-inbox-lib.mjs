@@ -24,6 +24,39 @@ export function parseFileName(fileName) {
   return { title: rawTitle, year, slug: slugify(rawTitle) }
 }
 
+// --- Episodios (SER-14) ---------------------------------------------------------
+
+/** Igual que episodeSlug de lib/movies.ts (la prueba compara ambos) */
+export function episodeSlug(seriesSlug, season, episode) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${seriesSlug.slice(0, 90).replace(/-+$/, '')}-s${pad(season)}e${pad(episode)}`
+}
+
+// Lo que traen los nombres de archivo después del título del episodio: no es parte del título
+const RELEASE_JUNK = /(^|[\s._-])(\d{3,4}p|4k|uhd|bluray|blu-ray|brrip|bdrip|web-?dl|webrip|web|hdtv|dvdrip|x26[45]|h\.?26[45]|hevc|10bit|hdr|remux|proper|repack)([\s._-]|$)/i
+
+/**
+ * Episodio por su ruta dentro de Entrada; null si no es episodio (no trae S01E02 ni 1x02).
+ * "Breaking Bad (2008) - S01E02 - Cat's in the Bag.mkv", "Breaking.Bad.S01E02.720p.mkv",
+ * "Breaking Bad (2008)/Temporada 1/S01E02.mkv" (la serie sale de la primera carpeta).
+ */
+export function parseEpisode(relPath) {
+  const parts = relPath.split('/')
+  const base = parts.at(-1).replace(/\.[^.]+$/, '')
+  const m = base.match(/^(.*?)[\s._-]*(?:\b[Ss](\d{1,3})[\s._-]?[Ee](\d{1,4})|\b(\d{1,2})[xX](\d{1,4}))(?=$|[\s._-])(.*)$/)
+  if (!m) return null
+
+  const season = Number(m[2] ?? m[4])
+  const episode = Number(m[3] ?? m[5])
+  const seriesSource = m[1].trim() || (parts.length > 1 ? parts[0] : '')
+  if (!seriesSource) return { error: 'No se pudo saber de qué serie es: ponle el nombre (Serie - S01E02.mkv) o mételo en una carpeta con el nombre de la serie.' }
+  const series = parseFileName(`${seriesSource}.x`)
+
+  const junk = m[6].search(RELEASE_JUNK)
+  const rawTitle = (junk >= 0 ? m[6].slice(0, junk) : m[6]).replace(/[._]+/g, ' ').replace(/^[\s-]+|[\s-]+$/g, '').replace(/\s+/g, ' ')
+  return { series, season, episode, title: rawTitle || `Episodio ${episode}` }
+}
+
 export const isVideo = (fileName) => !fileName.startsWith('.') && VIDEO_EXTENSIONS.includes(fileName.slice(fileName.lastIndexOf('.')).toLowerCase())
 
 /** Terminó de copiarse: mismo tamaño que en la revisión anterior y sin cambios hace ≥ 30 s */

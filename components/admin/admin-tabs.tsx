@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users, Clapperboard } from 'lucide-react'
+import { Users, Clapperboard, Tv } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
   { href: '/dashboard/admin', label: 'Usuarios', icon: Users, match: (p: string) => p === '/dashboard/admin' },
   { href: '/dashboard/admin/movies', label: 'Películas', icon: Clapperboard, match: (p: string) => p.startsWith('/dashboard/admin/movies') },
+  { href: '/dashboard/admin/series', label: 'Series', icon: Tv, match: (p: string) => p.startsWith('/dashboard/admin/series') },
 ]
 
 export function AdminTabs() {

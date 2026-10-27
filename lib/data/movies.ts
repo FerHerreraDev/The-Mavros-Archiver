@@ -2,17 +2,19 @@ import 'server-only'
 import { requireAdmin } from '@/lib/auth/guards'
 import type { Movie } from '@/lib/movies'
 
-/** Todas las películas (borradores incluidos) para el panel. null si no es admin. */
-export async function listMoviesForAdmin(): Promise<Movie[] | null> {
+export type AdminMovie = Movie & { series: { title: string } | null }
+
+/** Todas las películas (borradores incluidos) para el panel, con su serie si son episodios (SER-06). null si no es admin. */
+export async function listMoviesForAdmin(): Promise<AdminMovie[] | null> {
   const session = await requireAdmin()
   if (!session) return null
 
   const { data, error } = await session.supabase
     .from('movies')
-    .select('*')
+    .select('*, series(title)')
     .order('created_at', { ascending: false })
   if (error) throw new Error(`[MOVIES] list failed: ${error.message}`)
-  return data as Movie[]
+  return data as AdminMovie[]
 }
 
 export async function getMovieForAdmin(id: string): Promise<Movie | null> {

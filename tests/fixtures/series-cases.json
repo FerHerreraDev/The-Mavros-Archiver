@@ -1,0 +1,92 @@
+{
+  "_comment": "Casos compartidos web <-> Android (SER-10, SER-11, SER-13). Los usan tests/unit/series.test.ts y SeriesRulesTest.kt. Duración 1000 s: 95 % = 950, 5 % = 50.",
+  "episodes": [
+    { "id": "s0e1", "season": 0, "episode": 1, "duration": 1000 },
+    { "id": "s2e1", "season": 2, "episode": 1, "duration": 1000 },
+    { "id": "s1e2", "season": 1, "episode": 2, "duration": 1000 },
+    { "id": "s1e10", "season": 1, "episode": 10, "duration": 1000 },
+    { "id": "s1e1", "season": 1, "episode": 1, "duration": 1000 }
+  ],
+  "sorted": ["s1e1", "s1e2", "s1e10", "s2e1", "s0e1"],
+  "nextEpisode": [
+    { "current": "s1e1", "expected": "s1e2" },
+    { "current": "s1e2", "expected": "s1e10" },
+    { "current": "s1e10", "expected": "s2e1" },
+    { "current": "s2e1", "expected": "s0e1" },
+    { "current": "s0e1", "expected": null },
+    { "current": "no-existe", "expected": null }
+  ],
+  "nextUp": [
+    { "name": "nada visto: el primero en orden", "progress": [], "expected": { "id": "s1e1", "action": "start", "startAt": 0 } },
+    {
+      "name": "progreso de otra serie no cuenta",
+      "progress": [{ "movieId": "otra", "position": 500, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s1e1", "action": "start", "startAt": 0 }
+    },
+    {
+      "name": "a medias: continuar ese",
+      "progress": [{ "movieId": "s1e2", "position": 400, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s1e2", "action": "continue", "startAt": 400 }
+    },
+    {
+      "name": "recién empezado (< 10 s): reproducir ese desde 0",
+      "progress": [{ "movieId": "s1e2", "position": 5, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s1e2", "action": "play", "startAt": 0 }
+    },
+    {
+      "name": "manda el visto más recientemente, no el más avanzado",
+      "progress": [
+        { "movieId": "s2e1", "position": 300, "updatedAt": "2026-01-01T00:00:00Z" },
+        { "movieId": "s1e2", "position": 600, "updatedAt": "2026-01-02T00:00:00+00:00" }
+      ],
+      "expected": { "id": "s1e2", "action": "continue", "startAt": 600 }
+    },
+    {
+      "name": "terminado (95 %): el siguiente desde el principio",
+      "progress": [{ "movieId": "s1e2", "position": 950, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s1e10", "action": "play", "startAt": 0 }
+    },
+    {
+      "name": "terminado el último de la temporada: cruza a la siguiente",
+      "progress": [{ "movieId": "s1e10", "position": 1000, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s2e1", "action": "play", "startAt": 0 }
+    },
+    {
+      "name": "terminado el último de todos: volver a ver el primero",
+      "progress": [{ "movieId": "s0e1", "position": 990, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s1e1", "action": "rewatch", "startAt": 0 }
+    },
+    { "name": "serie sin episodios", "episodes": [], "progress": [], "expected": null }
+  ],
+  "seriesContinue": [
+    { "name": "nada visto", "progress": [], "expected": null },
+    {
+      "name": "a medias (entre 5 % y 95 %)",
+      "progress": [{ "movieId": "s1e2", "position": 400, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": { "id": "s1e2", "positionSeconds": 400, "updatedAt": "2026-01-01T00:00:00Z" }
+    },
+    {
+      "name": "menos de 5 %: no aparece",
+      "progress": [{ "movieId": "s1e2", "position": 49, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": null
+    },
+    {
+      "name": "terminado: el siguiente con progreso 0",
+      "progress": [{ "movieId": "s1e1", "position": 960, "updatedAt": "2026-01-03T00:00:00Z" }],
+      "expected": { "id": "s1e2", "positionSeconds": 0, "updatedAt": "2026-01-03T00:00:00Z" }
+    },
+    {
+      "name": "terminó la serie: no aparece",
+      "progress": [{ "movieId": "s0e1", "position": 999, "updatedAt": "2026-01-01T00:00:00Z" }],
+      "expected": null
+    },
+    {
+      "name": "el más reciente decide aunque otro vaya a medias",
+      "progress": [
+        { "movieId": "s1e2", "position": 400, "updatedAt": "2026-01-01T00:00:00Z" },
+        { "movieId": "s1e10", "position": 980, "updatedAt": "2026-01-05T00:00:00Z" }
+      ],
+      "expected": { "id": "s2e1", "positionSeconds": 0, "updatedAt": "2026-01-05T00:00:00Z" }
+    }
+  ]
+}

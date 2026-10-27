@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.testTag
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import com.mavros.archiver.core.model.Movie
+import com.mavros.archiver.core.model.HasPoster
 import com.mavros.archiver.core.model.ThumbHash
 
 /** ThumbHash -> bitmap diminuto (≤32 px). Se estira con filtrado bilineal: se ve como el póster borroso. */
@@ -41,7 +41,7 @@ fun thumbhashBitmap(hash: String?): ImageBitmap? {
  * Sin URL o si la imagen falla se muestra [fallback].
  */
 @Composable
-fun PosterImage(movie: Movie, modifier: Modifier = Modifier, fallback: @Composable () -> Unit) {
+fun PosterImage(movie: HasPoster, modifier: Modifier = Modifier, fallback: @Composable () -> Unit) {
     val placeholder = remember(movie.posterThumbhash) { thumbhashBitmap(movie.posterThumbhash) }
     var failed by remember(movie.posterSrc) { mutableStateOf(false) }
     val reduceMotion = rememberReduceMotion()

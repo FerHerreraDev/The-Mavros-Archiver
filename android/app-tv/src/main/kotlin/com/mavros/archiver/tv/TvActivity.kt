@@ -36,11 +36,14 @@ import com.mavros.archiver.tv.detail.TvDetailScreen
 import com.mavros.archiver.tv.login.TvLoginScreen
 import com.mavros.archiver.tv.login.TvLoginViewModel
 import com.mavros.archiver.tv.player.TvPlayerActivity
+import com.mavros.archiver.tv.series.TvSeriesScreen
+import com.mavros.archiver.core.android.series.SeriesViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable private data object CatalogRoute
 @Serializable private data class DetailRoute(val movieId: String)
+@Serializable private data class SeriesRoute(val seriesId: String)
 
 class TvActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,6 +105,7 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
             TvCatalogScreen(
                 state = state,
                 onOpenMovie = { nav.navigate(DetailRoute(it)) },
+                onOpenSeries = { nav.navigate(SeriesRoute(it)) },
                 onSignOut = { container.appScope.launch { container.auth.signOut() } },
                 onRetry = vm::retry,
             )
@@ -111,6 +115,12 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
             val vm: DetailViewModel = viewModel(key = movieId, factory = viewModelFactory { initializer { DetailViewModel(container.catalog, movieId, container.progress) } })
             val state by vm.state.collectAsStateWithLifecycle()
             TvDetailScreen(state, onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) }, onRetry = vm::retry)
+        }
+        composable<SeriesRoute> { entry ->
+            val seriesId = entry.toRoute<SeriesRoute>().seriesId
+            val vm: SeriesViewModel = viewModel(key = seriesId, factory = viewModelFactory { initializer { SeriesViewModel(container.catalog, seriesId, container.progress) } })
+            val state by vm.state.collectAsStateWithLifecycle()
+            TvSeriesScreen(state, onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) }, onSelectSeason = vm::selectSeason, onRetry = vm::retry)
         }
     }
 }

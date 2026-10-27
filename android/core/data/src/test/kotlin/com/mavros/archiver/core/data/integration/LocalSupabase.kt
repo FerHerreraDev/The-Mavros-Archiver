@@ -104,6 +104,10 @@ object LocalSupabase {
             (fields["genres"] as? List<*>)?.let { genres ->
                 put("genres", kotlinx.serialization.json.JsonArray(genres.map { kotlinx.serialization.json.JsonPrimitive(it as String) }))
             }
+            // Episodio (SER-03)
+            (fields["series_id"] as? String)?.let { put("series_id", it) }
+            (fields["season_number"] as? Int)?.let { put("season_number", it) }
+            (fields["episode_number"] as? Int)?.let { put("episode_number", it) }
         }
         val row = admin.postgrest.from("movies").insert(body) { select() }.decodeSingle<JsonObject>()
         val id = row["id"]!!.jsonPrimitive.content
@@ -111,6 +115,24 @@ object LocalSupabase {
             admin.postgrest.from("movies").update({ set("published_at", at) }) { filter { eq("id", id) } }
         }
         return id
+    }
+
+    suspend fun insertSeries(fields: Map<String, Any?> = emptyMap()): String {
+        val tag = UUID.randomUUID().toString().take(8)
+        val body = buildJsonObject {
+            put("slug", "and-serie-$tag")
+            put("title", (fields["title"] as? String) ?: "Serie $tag")
+            put("status", (fields["status"] as? String) ?: "published")
+            (fields["genres"] as? List<*>)?.let { genres ->
+                put("genres", kotlinx.serialization.json.JsonArray(genres.map { kotlinx.serialization.json.JsonPrimitive(it as String) }))
+            }
+        }
+        return admin.postgrest.from("series").insert(body) { select() }.decodeSingle<JsonObject>()["id"]!!.jsonPrimitive.content
+    }
+
+    /** Borra las series y, en cascada, sus episodios */
+    suspend fun deleteSeries(ids: Collection<String>) {
+        if (ids.isNotEmpty()) admin.postgrest.from("series").delete { filter { isIn("id", ids.toList()) } }
     }
 
     suspend fun deleteMovies(ids: Collection<String>) {
