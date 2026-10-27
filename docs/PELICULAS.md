@@ -1,5 +1,27 @@
 # Agregar una película
 
+## Lo fácil: la carpeta de entrada (automático)
+
+Una sola vez, instala el servicio:
+
+```bash
+pnpm movie:inbox:install
+```
+
+Desde entonces, **arrastra cualquier película a `~/Movies/Mavros/Entrada`** (mkv, mp4, mov, m4v o avi).
+Cada 5 minutos la Mac revisa esa carpeta y, cuando el archivo terminó de copiarse, la convierte, la
+verifica, la sube a R2 y la deja como **borrador** en el admin con título y año sacados del nombre
+(`Perfect Blue (1997).mkv` → "Perfect Blue", 1997). Te avisa con una notificación.
+
+- Luego, en el admin, agrega póster, géneros y sinopsis, y dale **Publicar**.
+- El original pasa a `Procesadas` (puedes borrarlo o guardarlo). Si algo falla, pasa a `Errores`
+  junto con un `.log` que explica por qué.
+- La Mac tiene que estar encendida y despierta mientras convierte.
+- Registro: `~/Library/Logs/mavros-inbox.log`. Para quitar el servicio: `scripts/install-movie-inbox.sh --quitar`.
+- Para correrlo a mano sin esperar: `pnpm movie:inbox`.
+
+## A mano (paso por paso)
+
 Tres pasos en tu Mac: convertir a HLS, subir a R2 y darla de alta en el panel.
 Requisitos (una sola vez): `brew install ffmpeg rclone` y el remoto de rclone `videos-backup`
 configurado con tus llaves de R2 (las llaves viven en la config de rclone, nunca en el repo).

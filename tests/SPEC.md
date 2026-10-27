@@ -166,6 +166,7 @@ Aplica a cada película que se sube a R2. Se verifica con `pnpm hls:verify` (loc
 | VID-06 | La calidad más alta conserva la resolución original, y ninguna calidad tiene más resolución que el original. |
 | VID-07 | En R2, cada playlist y cada segmento responde 200 con su tipo correcto (`application/vnd.apple.mpegurl` / `video/mp2t`) y permite CORS. |
 | VID-08 | Calidad por resolución (H.264, CRF con tope de bitrate y búfer de 2× el tope). Topes: **2160p 16 Mbps, 1440p 9, 1080p 6, 720p 3, 480p 1.4, 360p 0.8**. Cada calidad usa el tope de **su** resolución (un original 4K no queda limitado al tope de 1080p). Debajo del original se generan 1080p, 720p, 480p y 360p (solo las menores que el original). En un video real codificado, el **video** de ningún segmento supera su tope en más de 25 % (el audio se copia del original y no cuenta) y la calidad 1080p de un video exigente usa más de 3.5 Mbps (el tope anterior era 3). |
+| VID-09 | Carpeta de entrada en la Mac (`~/Movies/Mavros/Entrada`): cada video (mkv, mp4, mov, m4v, avi) que termine de copiarse (tamaño sin cambios ≥ 30 s) se convierte, verifica y sube solo a `movies/<slug>`, y queda como **borrador** con título y año sacados del nombre (`Perfect Blue (1997).mkv` → "Perfect Blue", 1997, slug `perfect-blue`; si el slug existe se agrega `-2`, `-3`…). El original pasa a `Procesadas`; si algo falla, a `Errores` con un `.log` de la causa. Nunca procesa dos veces el mismo archivo ni corre dos veces a la vez. |
 
 ## Fase 3 — Catálogo: modelo de datos y gestión de películas
 
