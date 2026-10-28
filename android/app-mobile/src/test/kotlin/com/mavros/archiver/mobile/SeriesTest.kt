@@ -74,14 +74,30 @@ class SeriesScreensTest {
         // En "Seguir viendo" el episodio lleva el póster y título de la serie y "T1:E2 · título"
         compose.onNodeWithTag("meta-e2", useUnmergedTree = true).assertTextContains("T1:E2 · El gato")
         compose.onNodeWithTag("progress-e2", useUnmergedTree = true).assertIsDisplayed()
+        // SER-20: la tarjeta del episodio abre la página de la serie, no el capítulo suelto
         compose.onNodeWithTag("poster-e2").performClick()
-        assertEquals("e2", openedMovie)
+        assertEquals("s", openedSeries)
+        assertEquals(null, openedMovie)
+        openedSeries = null
 
         compose.onNodeWithTag("catalog").performScrollToNode(hasTestTag("poster-s"))
         compose.onNodeWithText("Series").assertIsDisplayed()
         compose.onNodeWithTag("meta-s", useUnmergedTree = true).assertTextContains("2008 · 2 temporadas")
         compose.onNodeWithTag("poster-s").performClick()
         assertEquals("s", openedSeries)
+    }
+
+    @Test fun `SER-20 detalle de un episodio tiene Ver episodios y una pelicula no`() {
+        var opened: String? = null
+        var state by mutableStateOf<com.mavros.archiver.core.android.detail.DetailUiState>(
+            com.mavros.archiver.core.android.detail.DetailUiState.Content(com.mavros.archiver.core.model.MovieDetail(s1e2, null, show)),
+        )
+        content { com.mavros.archiver.mobile.detail.DetailContent(state, {}, {}, {}, {}, { opened = it }) }
+        compose.onNodeWithTag("open-series").performClick()
+        assertEquals("s", opened)
+        state = com.mavros.archiver.core.android.detail.DetailUiState.Content(com.mavros.archiver.core.model.MovieDetail(movie("1", "Akira"), null))
+        compose.waitForIdle()
+        compose.onNodeWithTag("open-series").assertDoesNotExist()
     }
 
     @Test fun `SER-08 sin peliculas pero con series no sale el estado vacio`() {

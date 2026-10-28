@@ -142,7 +142,8 @@ private fun CatalogGrid(
                                 poster = series,
                                 title = series.title,
                                 meta = "${item.movie.episodeTag} · ${item.movie.title}",
-                                onClick = { onOpenMovie(item.movie.id) },
+                                // Abre la página de la serie con "Continuar" listo (SER-20)
+                                onClick = { onOpenSeries(series.id) },
                                 progress = progress,
                                 modifier = Modifier.width(120.dp),
                                 tagId = item.movie.id,

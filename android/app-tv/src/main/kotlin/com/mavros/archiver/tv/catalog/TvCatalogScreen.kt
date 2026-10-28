@@ -71,7 +71,8 @@ fun tvRows(catalog: Catalog): List<TvRow> = buildList {
                     val progress = ProgressRules.progressRatio(item.positionSeconds, item.movie.durationSeconds)
                     val series = item.series
                     if (series == null) movieItem(item.movie, progress)
-                    else TvItem(item.movie.id, series, series.title, "${item.movie.episodeTag} · ${item.movie.title}", progress)
+                    // Un episodio abre la página de su serie con "Continuar" enfocado (SER-20)
+                    else TvItem(series.id, series, series.title, "${item.movie.episodeTag} · ${item.movie.title}", progress, isSeries = true)
                 },
             ),
         )

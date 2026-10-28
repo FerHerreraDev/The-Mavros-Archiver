@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.mavros.archiver.core.android.detail.DetailUiState
 import com.mavros.archiver.core.android.detail.playLabel
@@ -42,19 +43,25 @@ import com.mavros.archiver.tv.catalog.errorText
 
 /** TV-05: detalle con "Reproducir" / "Continuar desde" enfocado al abrir */
 @Composable
-fun TvDetailScreen(state: DetailUiState, onPlay: (Movie, Double) -> Unit, onRetry: () -> Unit, extra: @Composable () -> Unit = {}) {
+fun TvDetailScreen(
+    state: DetailUiState,
+    onPlay: (Movie, Double) -> Unit,
+    onRetry: () -> Unit,
+    extra: @Composable () -> Unit = {},
+    onOpenSeries: (String) -> Unit = {},
+) {
     Box(Modifier.fillMaxSize().background(MavrosColors.Background)) {
         when (state) {
             DetailUiState.Loading -> MavrosLoader(Modifier.align(Alignment.Center).testTag("tv-loading"), size = 72.dp)
             is DetailUiState.Error -> Message(errorText(state.error), onRetry)
             DetailUiState.NotAvailable -> Message("Esta película no está disponible.", null)
-            is DetailUiState.Content -> Body(state.detail, onPlay, extra)
+            is DetailUiState.Content -> Body(state.detail, onPlay, extra, onOpenSeries)
         }
     }
 }
 
 @Composable
-private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit, extra: @Composable () -> Unit) {
+private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit, extra: @Composable () -> Unit, onOpenSeries: (String) -> Unit) {
     val movie = detail.movie
     val play = remember { FocusRequester() }
     LaunchedEffect(movie.id) { runCatching { play.requestFocus() } }
@@ -77,6 +84,10 @@ private fun Body(detail: MovieDetail, onPlay: (Movie, Double) -> Unit, extra: @C
                 onClick = { onPlay(movie, ProgressRules.resumePosition(detail.positionSeconds, movie.durationSeconds)) },
                 modifier = Modifier.focusRequester(play).testTag("tv-play"),
             ) { Text(playLabel(detail), fontWeight = FontWeight.SemiBold) }
+            // Episodio: a su serie con todos los capítulos (SER-20)
+            detail.series?.let { series ->
+                OutlinedButton(onClick = { onOpenSeries(series.id) }, modifier = Modifier.testTag("tv-open-series")) { Text("Ver episodios") }
+            }
             // "Agregar a lista" (PL-07)
             extra()
             Spacer(Modifier.height(8.dp))

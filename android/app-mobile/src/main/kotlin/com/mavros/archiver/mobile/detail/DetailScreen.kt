@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -57,7 +58,13 @@ import com.mavros.archiver.mobile.ui.ErrorState
 import com.mavros.archiver.mobile.ui.DetailSkeleton
 
 @Composable
-fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit, extra: @Composable () -> Unit = {}) {
+fun DetailScreen(
+    viewModel: DetailViewModel,
+    onBack: () -> Unit,
+    onPlay: (movie: Movie, startAt: Double) -> Unit,
+    extra: @Composable () -> Unit = {},
+    onOpenSeries: (String) -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Al volver del reproductor, el botón muestra el progreso nuevo (MOB-19)
     var resumed by remember { mutableStateOf(false) }
@@ -65,13 +72,20 @@ fun DetailScreen(viewModel: DetailViewModel, onBack: () -> Unit, onPlay: (movie:
         if (resumed) viewModel.refresh() else resumed = true
         onPauseOrDispose { }
     }
-    DetailContent(state, onBack, { start -> (state as? DetailUiState.Content)?.detail?.movie?.let { onPlay(it, start) } }, viewModel::retry, extra)
+    DetailContent(state, onBack, { start -> (state as? DetailUiState.Content)?.detail?.movie?.let { onPlay(it, start) } }, viewModel::retry, extra, onOpenSeries)
 }
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailContent(state: DetailUiState, onBack: () -> Unit, onPlay: (Double) -> Unit, onRetry: () -> Unit, extra: @Composable () -> Unit = {}) {
+fun DetailContent(
+    state: DetailUiState,
+    onBack: () -> Unit,
+    onPlay: (Double) -> Unit,
+    onRetry: () -> Unit,
+    extra: @Composable () -> Unit = {},
+    onOpenSeries: (String) -> Unit = {},
+) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -88,13 +102,13 @@ fun DetailContent(state: DetailUiState, onBack: () -> Unit, onPlay: (Double) -> 
             DetailUiState.NotAvailable -> Box(Modifier.fillMaxSize().padding(padding).testTag("not-available"), contentAlignment = Alignment.Center) {
                 Text("Esta película no está disponible.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is DetailUiState.Content -> MovieDetailBody(state.detail, Modifier.padding(padding), onPlay, extra)
+            is DetailUiState.Content -> MovieDetailBody(state.detail, Modifier.padding(padding), onPlay, extra, onOpenSeries)
         }
     }
 }
 
 @Composable
-private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Double) -> Unit, extra: @Composable () -> Unit) {
+private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Double) -> Unit, extra: @Composable () -> Unit, onOpenSeries: (String) -> Unit) {
     val movie = detail.movie
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
@@ -136,6 +150,12 @@ private fun MovieDetailBody(detail: MovieDetail, modifier: Modifier, onPlay: (Do
             Icon(Icons.Filled.PlayArrow, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(playLabel(detail), fontWeight = FontWeight.SemiBold)
+        }
+        // Episodio: a su serie con todos los capítulos (SER-20)
+        detail.series?.let { series ->
+            OutlinedButton(onClick = { onOpenSeries(series.id) }, shape = RoundedCornerShape(999.dp), modifier = Modifier.fillMaxWidth().testTag("open-series")) {
+                Text("Ver episodios")
+            }
         }
         // "Agregar a lista" (PL-07)
         extra()

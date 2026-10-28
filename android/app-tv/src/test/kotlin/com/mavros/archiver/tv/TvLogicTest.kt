@@ -203,12 +203,12 @@ class TvRowsTest {
             ),
         )
         assertEquals(listOf("Seguir viendo", "Recién agregadas", "Series", "Drama"), rows.map { it.title })
-        // El episodio abre el episodio pero se ve con el póster y título de su serie
+        // SER-20: el episodio se ve con el póster y título de su serie y abre la página de la serie
         val continueItem = rows[0].items.single()
-        assertEquals("e2", continueItem.id)
+        assertEquals("s", continueItem.id)
         assertEquals("Breaking Bad", continueItem.title)
         assertEquals("T1:E2 · El gato", continueItem.meta)
-        assertEquals(false, continueItem.isSeries)
+        assertEquals(true, continueItem.isSeries)
         val seriesItem = rows[2].items.single()
         assertEquals("s", seriesItem.id)
         assertEquals("2008 · 2 temporadas", seriesItem.meta)

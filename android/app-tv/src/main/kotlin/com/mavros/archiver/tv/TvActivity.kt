@@ -129,6 +129,7 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
                 onPlay = { movie, start -> context.startActivity(TvPlayerActivity.intent(context, movie, start)) },
                 onRetry = vm::retry,
                 extra = { AddToList(container, PlaylistTarget.MovieTarget(movieId)) },
+                onOpenSeries = { nav.navigate(SeriesRoute(it)) },
             )
         }
         composable<SeriesRoute> { entry ->

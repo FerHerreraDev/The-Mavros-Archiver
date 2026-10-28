@@ -170,9 +170,17 @@ class TvScreensTest {
         assertEquals("e2", played)
     }
 
-    @Test fun `SER-12 detalle de un episodio muestra su serie`() {
-        content { TvDetailScreen(DetailUiState.Content(MovieDetail(episodes[1], null, show)), onPlay = { _, _ -> }, onRetry = {}) }
+    @Test fun `SER-12 y SER-20 detalle de un episodio muestra su serie y Ver episodios lleva a ella`() {
+        var opened: String? = null
+        content { TvDetailScreen(DetailUiState.Content(MovieDetail(episodes[1], null, show)), onPlay = { _, _ -> }, onRetry = {}, onOpenSeries = { opened = it }) }
         compose.onNodeWithTag("tv-series-line").assertTextContains("Breaking Bad · T1:E2")
+        compose.onNodeWithTag("tv-open-series").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals("s", opened)
+    }
+
+    @Test fun `SER-20 una pelicula no tiene Ver episodios`() {
+        content { TvDetailScreen(DetailUiState.Content(MovieDetail(movie("1", "Akira"), null)), onPlay = { _, _ -> }, onRetry = {}) }
+        compose.onNodeWithTag("tv-open-series").assertDoesNotExist()
     }
 
     // --- Listas (PL-07) ----------------------------------------------------------

@@ -119,6 +119,7 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 onBack = { nav.popBackStack() },
                 onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
                 extra = { AddToList(container, PlaylistTarget.MovieTarget(movieId)) },
+                onOpenSeries = { nav.navigate(SeriesRoute(it)) },
             )
         }
         composable<ProfileRoute> {
