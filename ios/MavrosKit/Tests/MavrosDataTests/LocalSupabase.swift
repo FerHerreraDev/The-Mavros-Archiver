@@ -87,3 +87,21 @@ enum LocalSupabase {
 }
 
 import Testing
+
+/// Limpieza que SÍ se espera (un `defer { Task {…} }` no alcanza a correr antes de que termine el proceso)
+final class Cleanup: @unchecked Sendable {
+    private var actions: [@Sendable () async -> Void] = []
+    func add(_ action: @escaping @Sendable () async -> Void) { actions.append(action) }
+    func run() async { for action in actions.reversed() { await action() } }
+}
+
+func cleaningUp(_ body: (Cleanup) async throws -> Void) async throws {
+    let cleanup = Cleanup()
+    do {
+        try await body(cleanup)
+        await cleanup.run()
+    } catch {
+        await cleanup.run()
+        throw error
+    }
+}
