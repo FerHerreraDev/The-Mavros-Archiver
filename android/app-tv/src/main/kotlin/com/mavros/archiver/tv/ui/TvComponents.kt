@@ -90,8 +90,10 @@ fun TvPosterCard(
         }
         // El póster enfocado crece 10 % (≈12 dp hacia abajo): el título no debe quedar tapado
         Spacer(Modifier.height(20.dp))
-        Text(title, color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-        Text(meta, style = MonoLabel, color = MavrosColors.MutedForeground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.testTag("tv-card-text-$tagId")) {
+            Text(title, color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+            Text(meta, style = MonoLabel, color = MavrosColors.MutedForeground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 

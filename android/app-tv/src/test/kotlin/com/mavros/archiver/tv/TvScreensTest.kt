@@ -5,11 +5,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -34,6 +39,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -73,6 +79,47 @@ class TvScreensTest {
         recent = listOf(movie("1", "Akira", listOf("anime")), movie("2", "Perfect Blue", listOf("anime")), movie("3", "Paprika")),
         continueWatching = emptyList(),
     )
+
+    @Test fun `TV-04 al bajar de fila, la fila enfocada queda completa a la vista (titulo, posters y sus textos)`() {
+        val genres = listOf("acción", "anime", "comedia", "drama", "terror", "misterio")
+        val movies = genres.flatMapIndexed { i, g -> (1..3).map { n -> movie("$i$n", "Película $g $n", listOf(g)) } }
+        content { TvCatalogScreen(CatalogUiState.Content(Catalog(genres, movies, emptyList()), null), {}, {}, {}) }
+        compose.waitForIdle()
+        // Lo visible es el área de la lista (debajo del encabezado), no toda la pantalla
+        val screen = compose.onNodeWithTag("tv-catalog").fetchSemanticsNode().boundsInRoot
+        // Recién agregadas + una fila por género: se baja por todas
+        // Una tecla a la vez, como con el control
+        for (key in listOf(Key.DirectionDown, Key.DirectionRight, Key.DirectionRight, Key.DirectionRight)) {
+            compose.onRoot().performKeyInput { pressKey(key) }
+            compose.waitForIdle()
+        }
+        // → en la última tarjeta no saca el foco de la fila
+        compose.onAllNodesWithTag("tv-card-03").onLast().assertIsFocused()
+        // Recorrer una fila hacia la derecha tampoco deja sus títulos fuera (lo que se vio en la tele)
+        for (id in listOf("01", "02", "03")) {
+            val text = compose.onAllNodesWithTag("tv-card-text-$id").fetchSemanticsNodes().last().boundsInRoot
+            val row = compose.onNodeWithTag("tv-row-1").fetchSemanticsNode().boundsInRoot
+            assertTrue(text.top >= screen.top && text.bottom <= screen.bottom && text.bottom <= row.bottom, "fila 1 al recorrerla: títulos cortados $text en $screen / fila $row")
+        }
+        System.getenv("MAVROS_SNAPSHOT_DIR")?.let { dir ->
+            val img = compose.onRoot().captureToImage().asAndroidBitmap()
+            java.io.File(dir, "tv-catalog.png").outputStream().use { img.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.waitForIdle()
+        // En cada fila: el título y datos de todas las tarjetas que se ven, completos (ni fuera de la pantalla ni recortados por la fila)
+        val cardText = SemanticsMatcher("texto de tarjeta") { (if (SemanticsProperties.TestTag in it.config) it.config[SemanticsProperties.TestTag] else "").startsWith("tv-card-text-") }
+        for (row in 0..genres.size) {
+            val rowBounds = compose.onNodeWithTag("tv-row-$row").fetchSemanticsNode().boundsInRoot
+            assertTrue(rowBounds.top >= screen.top && rowBounds.bottom <= screen.bottom, "fila $row cortada: $rowBounds en $screen")
+            val texts = compose.onAllNodes(cardText).fetchSemanticsNodes().map { it.boundsInRoot }
+                .filter { it.width > 0 && it.top >= rowBounds.top && it.top < rowBounds.bottom }
+            assertTrue(texts.isNotEmpty(), "fila $row sin tarjetas a la vista")
+            for (text in texts) assertTrue(text.bottom <= rowBounds.bottom && text.bottom <= screen.bottom, "fila $row: títulos cortados $text / fila $rowBounds")
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            compose.waitForIdle()
+        }
+    }
 
     @Test fun `TV-04 al abrir el foco esta en la primera pelicula y la flecha derecha avanza`() {
         var opened: String? = null
@@ -156,6 +203,44 @@ class TvScreensTest {
         compose.onNodeWithTag("tv-episode-e2").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals("e2" to 0.0, played)
+    }
+
+    @Test fun `SER-18 la fila de episodios y sus textos caben completos en la pantalla de la tele`() {
+        val long = "Una sinopsis larga como las de TMDB. ".repeat(12)
+        val show = this.show.copy(synopsis = long, genres = listOf("animación", "acción y aventura", "drama"))
+        val eps = (1..9).map { ep("x$it", 2, it, "Título del capítulo $it").copy(synopsis = long) }
+        val detail = com.mavros.archiver.core.model.SeriesDetail(show, eps, emptyMap(), com.mavros.archiver.core.model.SeriesRules.nextUp(eps, emptyList()))
+        content {
+            com.mavros.archiver.tv.series.TvSeriesScreen(com.mavros.archiver.core.android.series.SeriesUiState.Content(detail, 2), { _, _ -> }, {}, {}, extra = {
+                com.mavros.archiver.tv.lists.TvAddToList(com.mavros.archiver.core.android.lists.AddToListState(), {}, {})
+            })
+        }
+        compose.waitForIdle()
+        val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val row = compose.onNodeWithTag("tv-episodes").fetchSemanticsNode().boundsInRoot
+        assertTrue(row.bottom <= screen.bottom && row.top >= screen.top, "fila de episodios cortada: $row en $screen")
+        // Al recorrer los capítulos hacia la derecha la fila sigue completa
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
+        compose.waitForIdle()
+        System.getenv("MAVROS_SNAPSHOT_DIR")?.let { dir ->
+            val img = compose.onRoot().captureToImage().asAndroidBitmap()
+            java.io.File(dir, "tv-series.png").outputStream().use { img.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        val after = compose.onNodeWithTag("tv-episodes").fetchSemanticsNode().boundsInRoot
+        assertTrue(after.bottom <= screen.bottom, "fila de episodios cortada al recorrerla: $after en $screen")
+        // Los títulos de los capítulos a la vista, completos (nada cortado abajo ni a la izquierda)
+        for (n in 3..4) {
+            val text = compose.onNodeWithTag("tv-episode-text-x$n").fetchSemanticsNode().boundsInRoot
+            assertTrue(text.bottom <= screen.bottom && text.bottom <= after.bottom, "título del capítulo $n cortado abajo: $text en $screen / fila $after")
+        }
+        // La enfocada (x4) queda lejos de las orillas, con margen para crecer al enfocarse
+        val focused = compose.onNodeWithTag("tv-episode-x4").fetchSemanticsNode().boundsInRoot
+        assertTrue(focused.left >= screen.left + 40 && focused.right <= screen.right - 40, "capítulo enfocado pegado al borde: $focused en $screen")
+        // Las tarjetas a la vista no quedan cortadas a la izquierda por el margen de la página
+        for (n in 3..4) {
+            val card = compose.onNodeWithTag("tv-episode-x$n").fetchSemanticsNode().boundsInRoot
+            assertTrue(card.left >= after.left && card.right <= screen.right, "capítulo $n cortado a los lados: $card / fila $after")
+        }
     }
 
     @Test fun `SER-16 siguiente episodio - Ver ahora enfocado, OK lo reproduce`() {

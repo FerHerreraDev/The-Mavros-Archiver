@@ -19,6 +19,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,16 +96,17 @@ private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> 
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to MavrosColors.Background, 0.55f to MavrosColors.Background.copy(alpha = 0.7f), 1f to Color.Transparent)))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to MavrosColors.Background)))
 
-        Column(Modifier.fillMaxSize().padding(start = 64.dp, top = 48.dp, bottom = 32.dp).testTag("tv-series"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(Modifier.width(620.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(series.title, style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold), color = MavrosColors.Foreground, modifier = Modifier.testTag("tv-title"))
+        // Sin margen a los lados en la columna: las filas llegan a la orilla y no cortan tarjetas a la mitad (SER-18)
+        Column(Modifier.fillMaxSize().padding(top = 32.dp, bottom = 20.dp).testTag("tv-series"), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.padding(start = 64.dp).width(620.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(series.title, style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = MavrosColors.Foreground, modifier = Modifier.testTag("tv-title"))
                 Text(
                     (listOfNotNull(series.releaseYear?.toString(), CatalogSeries(series, detail.seasons.size, detail.episodes.size).countLabel) + series.genres)
                         .joinToString(" · ").uppercase(),
                     style = MonoLabel,
                     color = MavrosColors.Foreground.copy(alpha = 0.85f),
                 )
-                series.synopsis?.let { Text(it, color = MavrosColors.Foreground, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge) }
+                series.synopsis?.let { Text(it, color = MavrosColors.Foreground, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     detail.next?.let { next ->
                         Button(onClick = { onPlay(next.episode, next.startAt) }, modifier = Modifier.focusRequester(play).testTag("tv-play")) {
@@ -113,19 +119,28 @@ private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> 
             }
             Spacer(Modifier.weight(1f))
             if (detail.seasons.size > 1) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 64.dp), modifier = Modifier.testTag("tv-seasons")) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 64.dp), modifier = Modifier.testTag("tv-seasons")) {
                     items(detail.seasons) { s ->
                         FilterChip(selected = s == season, onClick = { onSelectSeason(s) }, modifier = Modifier.testTag("tv-season-$s")) { Text(seasonName(s)) }
                     }
                 }
             } else {
-                season?.let { Text(seasonName(it), style = MaterialTheme.typography.titleMedium, color = MavrosColors.Foreground) }
+                season?.let { Text(seasonName(it), style = MaterialTheme.typography.titleMedium, color = MavrosColors.Foreground, modifier = Modifier.padding(start = 64.dp)) }
             }
             // Episodios en fila de tarjetas 16:9 (SER-18)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(end = 64.dp, top = 8.dp, bottom = 8.dp), modifier = Modifier.testTag("tv-episodes")) {
-                items(shown, key = { it.id }) { episode ->
+            val row = rememberLazyListState()
+            val scope = rememberCoroutineScope()
+            LazyRow(state = row, horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(start = 64.dp, end = 64.dp, top = 8.dp, bottom = 4.dp), modifier = Modifier.testTag("tv-episodes")) {
+                itemsIndexed(shown, key = { _, it -> it.id }) { index, episode ->
                     val position = detail.progress[episode.id]
-                    TvEpisodeCard(episode, position, isNext = detail.next?.episode?.id == episode.id) {
+                    // La enfocada queda segunda desde la izquierda: nunca pegada (y cortada) al borde derecho
+                    val keepInView = Modifier.onFocusChanged {
+                        if (it.isFocused) scope.launch {
+                            withFrameNanos { }
+                            row.animateScrollToItem((index - 1).coerceAtLeast(0))
+                        }
+                    }
+                    TvEpisodeCard(episode, position, isNext = detail.next?.episode?.id == episode.id, modifier = keepInView) {
                         onPlay(episode, ProgressRules.resumePosition(position, episode.durationSeconds))
                     }
                 }
@@ -135,10 +150,10 @@ private fun Body(detail: SeriesDetail, season: Int?, onPlay: (Movie, Double) -> 
 }
 
 @Composable
-private fun TvEpisodeCard(episode: Movie, position: Double?, isNext: Boolean, onClick: () -> Unit) {
+private fun TvEpisodeCard(episode: Movie, position: Double?, isNext: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val inProgress = position != null && ProgressRules.isInProgress(position, episode.durationSeconds)
     val shape = RoundedCornerShape(12.dp)
-    Column(Modifier.width(300.dp)) {
+    Column(Modifier.width(260.dp)) {
         Card(
             onClick = onClick,
             shape = CardDefaults.shape(shape),
@@ -148,7 +163,7 @@ private fun TvEpisodeCard(episode: Movie, position: Double?, isNext: Boolean, on
                 focusedBorder = Border(BorderStroke(3.dp, MavrosColors.Accent), shape = shape),
             ),
             colors = CardDefaults.colors(containerColor = MavrosColors.Card),
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).testTag("tv-episode-${episode.id}"),
+            modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f).testTag("tv-episode-${episode.id}"),
         ) {
             Box(Modifier.fillMaxSize()) {
                 PosterImage(episode, Modifier.fillMaxSize()) {
@@ -161,9 +176,11 @@ private fun TvEpisodeCard(episode: Movie, position: Double?, isNext: Boolean, on
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Text("${episode.episodeNumber}. ${episode.title}", color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
-        Text(formatDurationShort(episode.durationSeconds), style = MonoLabel, color = MavrosColors.MutedForeground)
-        episode.synopsis?.let { Text(it, color = MavrosColors.MutedForeground, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) }
+        // La tarjeta enfocada crece 6 %: el texto va lo bastante abajo para no quedar tapado
+        Spacer(Modifier.height(12.dp))
+        Column(Modifier.testTag("tv-episode-text-${episode.id}")) {
+            Text("${episode.episodeNumber}. ${episode.title}", color = MavrosColors.Foreground, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+            Text(formatDurationShort(episode.durationSeconds), style = MonoLabel, color = MavrosColors.MutedForeground)
+        }
     }
 }

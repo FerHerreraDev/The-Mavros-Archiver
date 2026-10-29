@@ -18,6 +18,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.lazy.itemsIndexed
+import kotlinx.coroutines.launch
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -133,14 +138,27 @@ private fun Rows(rows: List<TvRow>, onOpenMovie: (String) -> Unit, onOpenSeries:
             if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
         }
     }
+    val list = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     LazyColumn(
+        state = list,
         contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(32.dp),
         modifier = Modifier.fillMaxSize().testTag("tv-catalog"),
     ) {
         rows.forEachIndexed { rowIndex, row ->
             item(key = "row-${row.title}") {
-                Column {
+                // La fila con el foco sube completa arriba: su título, pósters y textos a la vista (TV-04).
+                // Sin esto la lista solo mostraba el póster enfocado y sus títulos quedaban cortados abajo.
+                // Un cuadro después: Android primero acerca solo el póster enfocado y ese movimiento cancelaría este.
+                Column(
+                    Modifier.onFocusChanged {
+                        if (it.hasFocus) scope.launch {
+                            withFrameNanos { }
+                            list.animateScrollToItem(rowIndex)
+                        }
+                    },
+                ) {
                     Text(
                         row.title,
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
@@ -148,16 +166,28 @@ private fun Rows(rows: List<TvRow>, onOpenMovie: (String) -> Unit, onOpenSeries:
                         modifier = Modifier.padding(start = 48.dp).semantics { heading() },
                     )
                     Spacer(Modifier.height(16.dp))
+                    val rowState = rememberLazyListState()
                     LazyRow(
+                        state = rowState,
                         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         modifier = Modifier.testTag("tv-row-$rowIndex"),
                     ) {
-                        items(row.items, key = { "${row.title}-${it.id}" }) { item ->
+                        itemsIndexed(row.items, key = { _, it -> "${row.title}-${it.id}" }) { index, item ->
                             var focus: Modifier = if (rowIndex == 0 && item == row.items.first()) Modifier.focusRequester(first) else Modifier
                             // "Cerrar sesión" queda arriba a la derecha, fuera del haz de la flecha: ↑ desde la
                             // primera fila lleva ahí explícitamente (TV-07)
                             if (rowIndex == 0) focus = focus.focusProperties { up = signOut }
+                            // En las orillas de la fila el foco se queda: no salta a "Mis listas" ni a otra fila (TV-04)
+                            if (item == row.items.last()) focus = focus.focusProperties { right = FocusRequester.Cancel }
+                            if (item == row.items.first()) focus = focus.focusProperties { left = FocusRequester.Cancel }
+                            // La enfocada queda segunda desde la izquierda: nunca pegada (y cortada) al borde derecho
+                            focus = focus.onFocusChanged {
+                                if (it.isFocused) scope.launch {
+                                    withFrameNanos { }
+                                    rowState.animateScrollToItem((index - 1).coerceAtLeast(0))
+                                }
+                            }
                             TvPosterCard(
                                 item.poster,
                                 item.title,
