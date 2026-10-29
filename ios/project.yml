@@ -1,0 +1,78 @@
+# Proyecto de la app del iPad (Fase I). Se genera con: cd ios && xcodegen
+name: MavrosArchiver
+options:
+  bundleIdPrefix: com.mavros.archiver
+  deploymentTarget:
+    iOS: "18.0"
+packages:
+  MavrosKit:
+    path: MavrosKit
+configs:
+  Local: debug
+  Prod: release
+configFiles:
+  Local: Config/Local.generated.xcconfig
+  Prod: Config/Prod.generated.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "2" # solo iPad
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  MavrosArchiver:
+    type: application
+    platform: iOS
+    sources: [App]
+    dependencies:
+      - package: MavrosKit
+        product: MavrosModel
+      - package: MavrosKit
+        product: MavrosData
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mavros.archiver.ipad
+        PRODUCT_NAME: Mavros
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Mavros
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+    info:
+      path: App/Info.plist
+      properties:
+        MavrosSupabaseURL: $(MAVROS_SUPABASE_URL)
+        MavrosAnonKey: $(MAVROS_ANON_KEY)
+        MavrosSiteURL: $(MAVROS_SITE_URL)
+        # HTTP sin cifrar solo hacia la Mac (simulador → Supabase local); producción va por HTTPS (IPAD-01)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UIBackgroundModes: [audio]
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+  MavrosArchiverUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: MavrosArchiver
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mavros.archiver.ipad.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: MavrosArchiver
+schemes:
+  MavrosArchiver:
+    build:
+      targets:
+        MavrosArchiver: all
+        MavrosArchiverUITests: [test]
+    run:
+      config: Local
+    test:
+      config: Local
+      targets: [MavrosArchiverUITests]
+    archive:
+      config: Prod
