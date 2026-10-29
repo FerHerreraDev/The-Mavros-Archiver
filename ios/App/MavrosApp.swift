@@ -81,6 +81,8 @@ struct RootView: View {
 enum Route: Hashable {
     case movie(String)
     case series(String)
+    case lists
+    case list(String)
 }
 
 struct MainView: View {
@@ -95,9 +97,15 @@ struct MainView: View {
                     switch route {
                     case .movie(let id): DetailView(movieId: id, path: $path)
                     case .series(let id): SeriesView(seriesId: id)
+                    case .lists: ListsView(path: $path)
+                    case .list(let id): PlaylistView(playlistId: id, path: $path)
                     }
                 }
                 .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { path.append(Route.lists) } label: { Label("Mis listas", systemImage: "list.bullet.rectangle") }
+                            .accessibilityIdentifier("my-lists")
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             if let email { Text(email) }

@@ -96,14 +96,17 @@ struct SeriesView: View {
                     .joined(separator: " · ").uppercased())
                     .font(.caption.monospaced()).foregroundStyle(Theme.foreground.opacity(0.85))
                 if let synopsis = series.synopsis { Text(synopsis).lineLimit(4).frame(maxWidth: 640, alignment: .leading) }
-                if let next = detail.next {
-                    Button {
-                        playing = PlayRequest(movie: next.episode, startAt: next.startAt)
-                    } label: {
-                        Label(next.label, systemImage: "play.fill").font(.headline).padding(.horizontal, 20).padding(.vertical, 12)
+                HStack(spacing: 12) {
+                    if let next = detail.next {
+                        Button {
+                            playing = PlayRequest(movie: next.episode, startAt: next.startAt)
+                        } label: {
+                            Label(next.label, systemImage: "play.fill").font(.headline).padding(.horizontal, 20).padding(.vertical, 12)
+                        }
+                        .buttonStyle(.borderedProminent).tint(Color(white: 0.95)).foregroundStyle(.black)
+                        .accessibilityIdentifier("play")
                     }
-                    .buttonStyle(.borderedProminent).tint(Color(white: 0.95)).foregroundStyle(.black)
-                    .accessibilityIdentifier("play")
+                    AddToListButton(target: .series(series.id))
                 }
             }
             .padding(24)

@@ -70,6 +70,7 @@ struct DetailView: View {
                             Button("Ver episodios") { path.append(Route.series(series.id)) }
                                 .buttonStyle(.bordered).accessibilityIdentifier("open-series")
                         }
+                        AddToListButton(target: .movie(movie.id))
                     }
                     if let synopsis = movie.synopsis { Text(synopsis).padding(.top, 4) }
                 }
