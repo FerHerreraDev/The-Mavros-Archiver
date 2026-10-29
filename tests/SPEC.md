@@ -482,3 +482,32 @@ TMDB (themoviedb.org) es la base de datos gratuita de películas y series. Se us
 | TMDB-03 | Una serie con TMDB tiene **Completar episodios desde TMDB**: a cada episodio le pone el título (solo si está vacío o es el genérico "Episodio N"), la sinopsis (si está vacía) y su imagen (si no tiene). Los textos van en español de México; si TMDB no tiene traducción, en inglés. |
 | TMDB-04 | Carpeta de la Mac: una película nueva se busca en TMDB por nombre y año y, si hay resultado, se llena como TMDB-02. Una serie nueva igual; cada episodio toma título, sinopsis e imagen de TMDB (TMDB-03). Si el episodio no tiene imagen en TMDB se usa **un cuadro del propio video** (~25 % de la duración). Sin clave, sin red o sin resultado, sigue como antes: nunca manda el archivo a Errores por eso. |
 | TMDB-05 | Los géneros de TMDB se guardan normalizados (MOV-10). Donde se muestran datos de TMDB se reconoce la fuente ("Datos e imágenes: TMDB"), como piden sus condiciones de uso. |
+
+## Fase I — App para iPad (iPadOS, SwiftUI)
+
+App nativa en `ios/`. Mismo backend que la web y Android (Supabase con la clave pública + RLS, `/api/playback`). La lógica pura y los repositorios viven en un paquete Swift (`ios/MavrosKit`) que se prueba en la Mac con `swift test`; las pantallas se prueban en el simulador de iPad. Las reglas compartidas se prueban con **los mismos casos** que la web y Android.
+
+### Base, sesión y catálogo (fase I1)
+
+| ID | Requisito |
+|---|---|
+| IPAD-01 | La app solo lleva la URL de Supabase, la clave **pública** y la URL del sitio. Ni la service role key, ni el secreto del video, ni la clave de TMDB aparecen en el código, la configuración ni la app. Dos entornos: `local` (simulador → Supabase local, único lugar con HTTP sin cifrar) y `prod` (HTTPS). |
+| IPAD-02 | Las reglas puras dan exactamente lo mismo que la web y Android: validación del login (MOB-03), progreso (`resumePosition`, `isInProgress`), series (orden, qué sigue, seguir viendo), listas (reproducir y siguiente) y cambio de token (`swapToken`), con `tests/fixtures/*-cases.json`. |
+| IPAD-03 | Login con email y contraseña, misma validación y mismo mensaje genérico que MOB-03. La sesión se guarda en el **Llavero** del iPad: al cerrar y abrir sigue dentro, también con el token de acceso caducado (se renueva solo, MOB-04). Cerrar sesión la borra; una sesión revocada o un usuario desactivado vuelven al login (MOB-05, MOB-06). |
+| IPAD-04 | Catálogo con las mismas reglas que la web y Android: "Seguir viendo" (CAT-06, SER-11), "Recién agregadas" (sin episodios sueltos), "Series" (SER-08) y filtro por género. La cuadrícula se adapta al ancho (vertical, horizontal y pantalla dividida). Skeleton mientras carga (LOAD-01); sin red o con error del servidor, un mensaje claro con "Reintentar" (MOB-09). Una tarjeta de serie en "Seguir viendo" abre la página de la serie (SER-20). |
+| IPAD-05 | Página de la serie como en la web (SER-17, SER-18): imagen horizontal de fondo, título, datos, sinopsis, botón de "qué sigue" (SER-10), selector de temporada y episodios con imagen 16:9, progreso, título, duración y sinopsis. Detalle de película/episodio como MOB-08, con "Ver episodios" en un episodio (SER-20). Un borrador o algo inexistente → "no disponible". |
+
+### Reproductor (fase I2)
+
+| ID | Requisito |
+|---|---|
+| IPAD-06 | "Reproducir" / "Continuar" abre el reproductor nativo del iPad a pantalla completa con la URL de `/api/playback/<id>` (con `Authorization: Bearer`) y arranca en la posición de PRG-02. Calidad automática. |
+| IPAD-07 | El progreso se guarda igual que MOB-15 (cada ~10 s, al pausar y al salir), nunca regresa a 0 por salir antes de arrancar (PRG-06). El token se renueva solo antes de caducar y ante un 403, y el video sigue en el mismo punto (MOB-16). |
+| IPAD-08 | Picture in Picture, AirPlay a la tele y controles en la pantalla de bloqueo/Centro de control con el título. |
+| IPAD-09 | Al terminar un episodio, "Siguiente episodio" con cuenta regresiva de 10 s (SER-16); reproduciendo desde una lista, "Siguiente en la lista" (PL-07). |
+
+### Listas (fase I3)
+
+| ID | Requisito |
+|---|---|
+| IPAD-10 | Mis listas, una lista con "Reproducir lista" y sus elementos, y "Agregar a lista" en el detalle y en la serie (crear una lista nueva ahí mismo), con las mismas reglas que PL-01..PL-07. |
