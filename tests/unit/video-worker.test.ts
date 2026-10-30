@@ -69,6 +69,14 @@ describe('PLY-04 con token válido', () => {
     expect(res.headers.get('access-control-allow-headers')).toMatch(/range/i)
   })
 
+  it('subtítulos .vtt con su tipo y CORS (VID-12)', async () => {
+    const res = await get(`${CDN}/t/${await token()}/ladder/sub-0/index.vtt`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('text/vtt; charset=utf-8')
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    expect((await res.text()).startsWith('WEBVTT')).toBe(true)
+  })
+
   it('archivo que no existe → 404', async () => {
     expect((await get(`${CDN}/t/${await token()}/ladder/no-existe.m3u8`)).status).toBe(404)
   })

@@ -1,0 +1,12 @@
+{
+  "cases": [
+    { "name": "elige la pista del idioma guardado", "tracks": ["es", "en"], "saved": "en", "expected": 1 },
+    { "name": "español guardado, primera pista", "tracks": ["es", "en"], "saved": "es", "expected": 0 },
+    { "name": "es también acepta es-419", "tracks": ["es-419"], "saved": "es", "expected": 0 },
+    { "name": "sin distinguir mayúsculas ni región", "tracks": ["en"], "saved": "EN-us", "expected": 0 },
+    { "name": "sin preferencia", "tracks": ["es", "en"], "saved": null, "expected": -1 },
+    { "name": "subtítulos apagados", "tracks": ["es", "en"], "saved": "off", "expected": -1 },
+    { "name": "la película no tiene ese idioma", "tracks": ["es", "en"], "saved": "ja", "expected": -1 },
+    { "name": "pistas sin idioma", "tracks": [null, null], "saved": "es", "expected": -1 }
+  ]
+}

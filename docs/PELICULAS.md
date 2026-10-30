@@ -20,6 +20,23 @@ verifica, la sube a R2 y la deja como **borrador** en el admin con título y añ
 - Registro: `~/Library/Logs/mavros-inbox.log`. Para quitar el servicio: `scripts/install-movie-inbox.sh --quitar`.
 - Para correrlo a mano sin esperar: `pnpm movie:inbox`.
 
+### Idiomas y subtítulos
+
+Si el archivo trae **varias pistas de audio** (por ejemplo español latino e inglés), cada una queda
+como idioma aparte y en el reproductor se elige en **Audio** (web: ⚙ → Audio; Android: botón de
+subtítulos arriba; tele: botón Audio; iPad: menú del reproductor). Por defecto suena la primera pista
+del archivo.
+
+Los **subtítulos de texto** que traiga el archivo (srt, ass, mov_text) quedan como subtítulos
+opcionales, **apagados al empezar**. Lo que cada quien elige se recuerda en ese navegador o
+dispositivo para las siguientes películas.
+
+- Se descartan solas las pistas de subtítulos casi vacías y las líneas de anuncios ("Únete a Telegram…").
+- Los subtítulos **quemados** en la imagen no se pueden quitar, y los de imagen (PGS/VobSub de
+  algunos mkv) no se convierten.
+- Revisa qué trae un archivo antes de subirlo:
+  `ffprobe -v error -show_entries stream=index,codec_type,codec_name:stream_tags=language,title "<archivo>"`
+
 ### Series
 
 Los episodios se reconocen por `S01E02` (o `1x02`) en el nombre. Sirven cualquiera de estas formas:
@@ -68,7 +85,8 @@ pnpm hls:encode "~/Movies/Mi Pelicula (2025).mkv" out/mi-pelicula
 ```
 
 - Crea la calidad original + 720p / 480p / 360p (solo las menores que el original), con
-  segmentos de 6 s alineados entre calidades. El audio se copia sin recodificar.
+  segmentos de 6 s alineados entre calidades. El audio se copia sin recodificar; con varios
+  idiomas, cada uno va aparte, y los subtítulos de texto pasan a WebVTT (ver "Idiomas y subtítulos").
 - Tarda: según la película y tu Mac, de unos minutos a un par de horas (`PRESET=medium` es más rápido
   y pesa un poco más; por defecto `slow`).
 - Para probar rápido con solo 60 s: `pnpm hls:encode "<archivo>" out/prueba 60`.

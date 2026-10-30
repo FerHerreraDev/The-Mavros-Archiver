@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Verifica una película HLS contra VID-01..VID-07 (tests/SPEC.md).
+// Verifica una película HLS contra VID-01..VID-07, VID-11 y VID-12 (tests/SPEC.md).
 //
 //   node scripts/hls-verify.mjs <carpeta local | URL del master.m3u8> [--source <video original>]
 //
@@ -9,6 +9,7 @@ import { readFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { parseMaster, parseMedia, validateLadder } from '../lib/hls/playlist.mjs'
+import { parseRenditions, validateRenditions } from '../lib/hls/tracks.mjs'
 
 const args = process.argv.slice(2)
 const target = args[0]
@@ -38,6 +39,7 @@ function probeSource(file) {
 const EXPECTED_TYPES = {
   '.m3u8': ['application/vnd.apple.mpegurl', 'application/x-mpegurl'],
   '.ts': ['video/mp2t'],
+  '.vtt': ['text/vtt'],
 }
 
 // r2.dev limita la velocidad (429) y a veces corta conexiones: reintentar con espera.
@@ -89,8 +91,12 @@ async function pool(items, size, fn) {
   return results
 }
 
-const variants = parseMaster(await read(masterLocation))
+const masterText = await read(masterLocation)
+const variants = parseMaster(masterText)
+const renditions = parseRenditions(masterText)
 const medias = {}
+const trackMedias = {}
+const vtt = {}
 const segmentLocations = []
 for (const v of variants) {
   const loc = resolve(masterLocation, v.uri)
@@ -101,16 +107,32 @@ for (const v of variants) {
     // validateLadder reporta la playlist faltante
   }
 }
+// Pistas de audio y subtítulos (VID-11, VID-12)
+for (const r of renditions.renditions.filter((r) => r.uri)) {
+  const loc = resolve(masterLocation, r.uri)
+  try {
+    trackMedias[r.uri] = parseMedia(await read(loc))
+    const segs = trackMedias[r.uri].segments.map((s) => resolve(loc, s.uri))
+    segmentLocations.push(loc, ...segs)
+    if (r.type === 'SUBTITLES') vtt[r.uri] = await Promise.all(segs.map((s) => read(s).catch(() => undefined)))
+  } catch {
+    // validateRenditions reporta la playlist faltante
+  }
+}
 
-const errors = validateLadder(variants, medias, sourceFile ? probeSource(sourceFile) : {})
+const source = sourceFile ? probeSource(sourceFile) : {}
+const errors = [...validateLadder(variants, medias, source), ...validateRenditions(renditions, trackMedias, { sourceDuration: source.sourceDuration, vtt })]
 
 if (isUrl) {
   const remote = await pool([masterLocation, ...segmentLocations], 6, checkRemote)
   errors.push(...remote.filter(Boolean))
 }
 
-const segments = Object.values(medias).reduce((n, m) => n + m.segments.length, 0)
+const segments = [...Object.values(medias), ...Object.values(trackMedias)].reduce((n, m) => n + m.segments.length, 0)
+const tracks = (type) => renditions.renditions.filter((r) => r.type === type).map((r) => r.name).join(', ')
 console.log(`${variants.length} calidades: ${variants.map((v) => `${v.resolution?.width}x${v.resolution?.height} @ ${(v.bandwidth / 1e6).toFixed(2)} Mbps`).join(' | ')}`)
+if (tracks('AUDIO')) console.log(`Audio: ${tracks('AUDIO')}`)
+if (tracks('SUBTITLES')) console.log(`Subtítulos: ${tracks('SUBTITLES')}`)
 console.log(`${segments} segmentos${isUrl ? ' revisados en remoto' : ''}`)
 
 if (errors.length) {
@@ -119,4 +141,4 @@ if (errors.length) {
   if (errors.length > 30) console.error(`  … y ${errors.length - 30} más`)
   process.exit(1)
 }
-console.log('\n✓ Cumple VID-01..' + (isUrl ? 'VID-07' : 'VID-06'))
+console.log('\n✓ Cumple VID-01..' + (isUrl ? 'VID-07' : 'VID-06') + (renditions.renditions.length ? ', VID-11 y VID-12' : ''))

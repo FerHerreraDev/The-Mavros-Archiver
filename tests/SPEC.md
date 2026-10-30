@@ -158,16 +158,18 @@ Aplica a cada película que se sube a R2. Se verifica con `pnpm hls:verify` (loc
 
 | ID | Requisito |
 |---|---|
-| VID-01 | Existe un `master.m3u8` con al menos 3 calidades (resoluciones distintas), cada una con `BANDWIDTH`, `RESOLUTION` y `CODECS`. |
+| VID-01 | Existe un `master.m3u8` con al menos 3 calidades (resoluciones distintas), cada una con `BANDWIDTH`, `RESOLUTION` y `CODECS`, y cada una en su propia carpeta (nunca dos calidades con la misma playlist: un original entre escalones, p. ej. 1782 de ancho, va en `original/`). |
 | VID-02 | Cada calidad es VOD completa (`#EXT-X-PLAYLIST-TYPE:VOD` y `#EXT-X-ENDLIST`). |
 | VID-03 | Todos los segmentos, salvo el último, duran 6 s (±0.1 s); ninguno supera `#EXT-X-TARGETDURATION`. |
 | VID-04 | Las calidades están alineadas: mismo número de segmentos y la misma duración en cada posición (±0.05 s), para cambiar de calidad sin saltos. |
 | VID-05 | La duración total de cada calidad coincide con la del archivo original (±1 s). |
 | VID-06 | La calidad más alta conserva la resolución original, y ninguna calidad tiene más resolución que el original. |
-| VID-07 | En R2, cada playlist y cada segmento responde 200 con su tipo correcto (`application/vnd.apple.mpegurl` / `video/mp2t`) y permite CORS. |
+| VID-07 | En R2, cada playlist y cada segmento responde 200 con su tipo correcto (`application/vnd.apple.mpegurl` / `video/mp2t` / `text/vtt`) y permite CORS; incluye las pistas de audio y subtítulos (VID-11, VID-12). |
 | VID-08 | Calidad por resolución (H.264, CRF con tope de bitrate y búfer de 2× el tope). Topes: **2160p 16 Mbps, 1440p 9, 1080p 6, 720p 3, 480p 1.4, 360p 0.8**. Cada calidad usa el tope de **su** resolución (un original 4K no queda limitado al tope de 1080p). Debajo del original se generan 1080p, 720p, 480p y 360p (solo las menores que el original). En un video real codificado, el **video** de ningún segmento supera su tope en más de 25 % (el audio se copia del original y no cuenta) y la calidad 1080p de un video exigente usa más de 3.5 Mbps (el tope anterior era 3). |
 | VID-09 | Carpeta de entrada en la Mac (`~/Movies/Mavros/Entrada`): cada video (mkv, mp4, mov, m4v, avi) que termine de copiarse (tamaño sin cambios ≥ 30 s) se convierte, verifica y sube solo a `movies/<slug>`, y queda como **borrador** con título y año sacados del nombre (`Perfect Blue (1997).mkv` → "Perfect Blue", 1997, slug `perfect-blue`; si el slug existe se agrega `-2`, `-3`…). El original pasa a `Procesadas`; si algo falla, a `Errores` con un `.log` de la causa. Nunca procesa dos veces el mismo archivo ni corre dos veces a la vez. |
 | VID-10 | Mientras procesa una película, en `Entrada` aparece un archivo cuyo **nombre** muestra el paso (convirtiendo / verificando / subiendo), una barra, el porcentaje y el tiempo que falta (estimado con lo que lleva); se actualiza solo y desaparece al terminar. `pnpm movie:progreso` muestra lo mismo en la Terminal. |
+| VID-11 | **Idiomas de audio.** Si el original trae más de una pista de audio, cada una queda como pista aparte del master (`#EXT-X-MEDIA:TYPE=AUDIO`, un mismo `GROUP-ID` que todas las calidades citan con `AUDIO=`), con `LANGUAGE` (BCP-47: `spa` → `es`) y `NAME` legible en español ("Español", "Inglés"…; si dos comparten idioma, se numeran). La pista por defecto (`DEFAULT=YES`) es la primera del original. Cada playlist de audio es VOD completa y dura lo mismo que el original (±1 s). Con una sola pista de audio no cambia nada (va dentro de cada calidad). |
+| VID-12 | **Subtítulos opcionales.** Cada pista de subtítulos de texto del original (srt, ass, mov_text, webvtt) queda como pista WebVTT del master (`#EXT-X-MEDIA:TYPE=SUBTITLES`, un mismo `GROUP-ID` que todas las calidades citan con `SUBTITLES=`), **apagada por defecto** (`DEFAULT=NO`), con `LANGUAGE` y `NAME` como VID-11. Su playlist es VOD completa con un `.vtt` que empieza con `WEBVTT` y lleva `X-TIMESTAMP-MAP` alineado con el inicio del video. Se descartan las pistas con menos de 20 líneas (vacías o de anuncios) y las líneas de anuncios (Telegram, enlaces). Los subtítulos de imagen (PGS/VobSub) y los quemados en el video no se pueden convertir. |
 
 ## Fase 3 — Catálogo: modelo de datos y gestión de películas
 
@@ -213,7 +215,7 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | ID | Requisito |
 |---|---|
 | PLY-03 | Sin token, con token inválido, caducado o de otra película → 403 y no se lee nada de R2. |
-| PLY-04 | Con token válido entrega `.m3u8` y `.ts` con su tipo correcto, CORS y soporte de `Range` (206). Archivo inexistente → 404. Cualquier otro tipo de archivo o ruta con `..` → 403/404, nunca se sirve. |
+| PLY-04 | Con token válido entrega `.m3u8`, `.ts` y `.vtt` con su tipo correcto, CORS y soporte de `Range` (206). Archivo inexistente → 404. Cualquier otro tipo de archivo o ruta con `..` → 403/404, nunca se sirve. |
 | PLY-05 | Las rutas relativas de las playlists siguen funcionando: el token va en la ruta (`/t/<token>/…`), así que cada segmento lo hereda sin reescribir playlists. |
 
 ### Endpoint `GET /api/playback/<movieId>`
@@ -251,6 +253,7 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | WATCH-02 | El video se reproduce de verdad en el navegador (avanza el tiempo) usando la URL firmada del Worker; incluye controles, pantalla completa y selección de calidad. |
 | WATCH-03 | Si el token caduca o el Worker responde 403 durante la reproducción, el reproductor pide una URL nueva a `/api/playback` y sigue desde el mismo punto, sin que el usuario haga nada. |
 | WATCH-04 | La página muestra título, año, duración, géneros y sinopsis. |
+| WATCH-05 | Si la película tiene varios idiomas de audio (VID-11), el menú de ajustes del reproductor ofrece **Audio** con cada idioma; si tiene subtítulos (VID-12), el botón de subtítulos los prende/apaga y el menú deja elegir el idioma. Arrancan apagados. La elección (idioma de audio, idioma de subtítulos o apagados) se recuerda en ese navegador y se aplica sola a las siguientes películas que tengan ese idioma. |
 
 ### Progreso (`watch_progress`)
 
@@ -361,6 +364,7 @@ Mismas reglas que la web (PLY, WATCH, PRG), con el reproductor del sistema. La l
 | MOB-17 | Salir a inicio mientras reproduce pasa a **Picture-in-Picture** (ventana flotante) y el video sigue. Tocar la notificación de medios abre el reproductor a pantalla completa, también si estaba en PiP. |
 | MOB-18 | Controles en la pantalla de bloqueo y en la notificación de medios (reproducir/pausa, título) mientras hay reproducción. |
 | MOB-19 | Al volver del reproductor, el detalle y "Seguir viendo" muestran el progreso nuevo. |
+| MOB-20 | Junto a **Calidad**, el reproductor ofrece **Audio** (si hay más de un idioma, VID-11) y **Subtítulos** ("Desactivados" o cada idioma, si hay, VID-12), con las mismas reglas que WATCH-05: arrancan apagados y la elección se recuerda en el teléfono para las siguientes películas. |
 
 ## Fase A4 — App para la tele (Google TV)
 
@@ -376,6 +380,7 @@ App aparte (`app-tv`) para Google TV / Android TV 9+, con la misma lógica que e
 | TV-06 | Reproductor a pantalla completa con las mismas reglas que el teléfono: progreso (MOB-15) y token (MOB-16). Control remoto: con los **controles ocultos**, OK los muestra (enfocando ⏯) y ←/→ adelantan/atrasan 10 s; con los **controles visibles**, las flechas se mueven entre los botones (⏪10, ⏯, ⏩10, **Calidad**) y OK activa el botón enfocado, nunca pausa por su cuenta. Las teclas ⏯/⏪/⏩ del control siempre actúan. Atrás oculta los controles y, si ya están ocultos, sale guardando. Los controles se ocultan solos tras 5 s sin tocar nada mientras reproduce, pero **no** mientras la lista de calidades está abierta. **Calidad** ofrece "Automática" y cada resolución disponible (igual que MOB-14). |
 | TV-07 | Se puede cerrar sesión desde la tele (vuelve a la pantalla del código). |
 | TV-08 | La app aparece en el inicio de Google TV (banner) y solo pide permiso de internet. |
+| TV-09 | En la fila de controles, junto a **Calidad**, aparecen **Audio** y **Subtítulos** cuando la película los tiene (MOB-20), con las mismas reglas de control remoto que Calidad (TV-06: no se ocultan los controles con la lista abierta) y la elección se recuerda en la tele. |
 
 ## Estados de carga (web y Android)
 
@@ -505,6 +510,7 @@ App nativa en `ios/`. Mismo backend que la web y Android (Supabase con la clave 
 | IPAD-07 | El progreso se guarda igual que MOB-15 (cada ~10 s, al pausar y al salir), nunca regresa a 0 por salir antes de arrancar (PRG-06). El token se renueva solo antes de caducar y ante un 403, y el video sigue en el mismo punto (MOB-16). |
 | IPAD-08 | Picture in Picture, AirPlay a la tele y controles en la pantalla de bloqueo/Centro de control con el título. |
 | IPAD-09 | Al terminar un episodio, "Siguiente episodio" con cuenta regresiva de 10 s (SER-16); reproduciendo desde una lista, "Siguiente en la lista" (PL-07). |
+| IPAD-11 | El menú del reproductor nativo ofrece los idiomas de audio (VID-11) y los subtítulos (VID-12, apagados al empezar) de la película. |
 
 ### Listas (fase I3)
 

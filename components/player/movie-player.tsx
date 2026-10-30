@@ -1,12 +1,15 @@
 'use client'
 
 import '@videojs/react/video/skin.css'
+// Menús del reproductor en español (la página tiene lang="es")
+import '@videojs/react/i18n/locales/es/register'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { VideoPlayer, VideoSkin } from '@videojs/react/video'
 import { HlsJsVideo, type HlsJsAdapter, type HlsSource } from '@videojs/react/media/hlsjs-video'
 import { createClient } from '@/lib/supabase/client'
 import { swapToken } from '@/lib/video/swap-token'
+import { AUDIO_KEY, OFF, pickTrack, readPreference, savePreference, SUBTITLES_KEY } from '@/lib/video/track-preference'
 
 const SAVE_EVERY_SECONDS = 10
 // Renovar el token 5 min antes de que caduque (WATCH-03)
@@ -26,6 +29,10 @@ type Props = {
 const NEXT_COUNTDOWN_SECONDS = 10
 
 type HlsErrorData = { fatal?: boolean; response?: { code?: number }; networkDetails?: { status?: number } }
+type HlsHandler = (...a: unknown[]) => void
+type HlsEngine = { on: (e: string, fn: HlsHandler) => void; off: (e: string, fn: HlsHandler) => void; audioTracks: { lang?: string }[]; audioTrack: number }
+
+const isSubtitles = (t: TextTrack) => t.kind === 'subtitles' || t.kind === 'captions'
 
 export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpiresAt, startAt, next }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -35,6 +42,8 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const lastSaved = useRef<number | null>(null)
   const resumed = useRef(false)
+  // Solo se recuerda lo que el usuario cambia ya reproduciendo, no lo que se elige solo al cargar
+  const started = useRef(false)
   const supabase = useMemo(() => createClient(), [])
   const [showNext, setShowNext] = useState(false)
 
@@ -111,6 +120,59 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
     }
   }, [refresh])
 
+  // --- Idiomas (WATCH-05): audio y subtítulos recordados en este navegador ---
+  useEffect(() => {
+    let attached: HlsEngine | null = null
+    const onAudioTracks = () => {
+      if (!attached) return
+      const i = pickTrack(attached.audioTracks, readPreference(AUDIO_KEY))
+      if (i >= 0 && i !== attached.audioTrack) attached.audioTrack = i
+    }
+    const onAudioSwitched = (_event: unknown, data: { id: number }) => {
+      if (started.current) savePreference(AUDIO_KEY, attached?.audioTracks[data.id]?.lang)
+    }
+    const handlers: [string, HlsHandler][] = [
+      ['hlsAudioTracksUpdated', onAudioTracks as HlsHandler],
+      ['hlsAudioTrackSwitched', onAudioSwitched as HlsHandler],
+    ]
+    const timer = setInterval(() => {
+      const engine = mediaRef.current?.engine as unknown as HlsEngine | null
+      if (engine && engine !== attached) {
+        handlers.forEach(([e, fn]) => attached?.off(e, fn))
+        handlers.forEach(([e, fn]) => engine.on(e, fn))
+        attached = engine
+        if (engine.audioTracks?.length) onAudioTracks()
+      }
+    }, 250)
+    return () => {
+      clearInterval(timer)
+      handlers.forEach(([e, fn]) => attached?.off(e, fn))
+    }
+  }, [])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const tracks = video.textTracks
+    const onAdd = (event: TrackEvent) => {
+      const track = event.track as TextTrack | null
+      if (!track || !isSubtitles(track) || Array.from(tracks).some((t) => isSubtitles(t) && t.mode === 'showing')) return
+      if (pickTrack([{ lang: track.language }], readPreference(SUBTITLES_KEY)) === 0) track.mode = 'showing'
+    }
+    const onChange = () => {
+      // hls.js apaga y quita sus pistas al salir: eso no es una elección
+      if (!started.current || !video.querySelector('track[data-removeondestroy]')) return
+      const showing = Array.from(tracks).find((t) => isSubtitles(t) && t.mode === 'showing')
+      savePreference(SUBTITLES_KEY, showing?.language || OFF)
+    }
+    tracks.addEventListener('addtrack', onAdd)
+    tracks.addEventListener('change', onChange)
+    return () => {
+      tracks.removeEventListener('addtrack', onAdd)
+      tracks.removeEventListener('change', onChange)
+    }
+  }, [])
+
   // --- Progreso (PRG-01) --------------------------------------------------
   const save = useCallback(
     async (position: number) => {
@@ -165,7 +227,10 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
               void save(videoRef.current?.duration ?? 0)
               if (next) setShowNext(true)
             }}
-            onPlay={() => setShowNext(false)}
+            onPlay={() => {
+              started.current = true
+              setShowNext(false)
+            }}
           />
           {/* Dentro del skin: sigue visible en pantalla completa */}
           {next && showNext && <NextEpisode next={next} onCancel={() => setShowNext(false)} />}

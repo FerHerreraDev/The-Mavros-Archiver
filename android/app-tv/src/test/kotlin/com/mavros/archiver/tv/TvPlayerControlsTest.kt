@@ -14,6 +14,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import com.mavros.archiver.core.android.player.qualityLabels
+import com.mavros.archiver.core.android.player.TrackChoices
+import com.mavros.archiver.core.model.TrackOption
 import com.mavros.archiver.tv.player.TvPlayerControls
 import org.junit.Rule
 import org.junit.Test
@@ -36,8 +38,10 @@ class TvPlayerControlsTest {
     private var forward = 0
     private var quality: Int? = -1
     private var hidden = 0
+    private var audio: String? = null
+    private var subtitles: String? = "sin tocar"
 
-    private fun controls(visible: Boolean = true) = compose.setContent {
+    private fun controls(visible: Boolean = true, tracks: TrackChoices = TrackChoices()) = compose.setContent {
         MavrosTvTheme {
             TvPlayerControls(
                 visible = visible,
@@ -53,6 +57,9 @@ class TvPlayerControlsTest {
                 onSelectQuality = { quality = it },
                 interaction = 0,
                 onAutoHide = { hidden++ },
+                tracks = tracks,
+                onSelectAudio = { audio = it },
+                onSelectSubtitles = { subtitles = it },
             )
         }
     }
@@ -134,5 +141,44 @@ class TvPlayerControlsTest {
         compose.mainClock.autoAdvance = false
         compose.mainClock.advanceTimeBy(12_000)
         assertEquals(0, hidden, "la lista abierta detiene el temporizador")
+    }
+
+    private val languages = TrackChoices(
+        audio = listOf(TrackOption("es", "Español"), TrackOption("en", "Inglés")),
+        selectedAudio = "es",
+        subtitles = listOf(TrackOption("es", "Español")),
+    )
+
+    @Test fun `TV-09 Audio y Subtitulos junto a Calidad - elegir ingles con el control`() {
+        controls(tracks = languages)
+        compose.onNodeWithText("Desactivados").assertIsDisplayed()
+        press(Key.DirectionRight); press(Key.DirectionRight); press(Key.DirectionRight)
+        compose.onNodeWithTag("tv-audio").assertIsFocused()
+        press(Key.DirectionCenter)
+        // El foco empieza en el idioma elegido (Español): bajar a Inglés
+        compose.onNodeWithTag("tv-audio-es").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-audio-en").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        assertEquals("en", audio)
+        assertEquals(0, toggles, "elegir idioma no pausa")
+    }
+
+    @Test fun `TV-09 Subtitulos - prender en espanol con el control`() {
+        controls(tracks = languages)
+        repeat(4) { press(Key.DirectionRight) }
+        compose.onNodeWithTag("tv-subtitles").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("tv-subtitles-off").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-subtitles-es").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        assertEquals("es", subtitles)
+    }
+
+    @Test fun `TV-09 sin idiomas que elegir no aparecen los botones`() {
+        controls()
+        compose.onNodeWithTag("tv-audio").assertDoesNotExist()
+        compose.onNodeWithTag("tv-subtitles").assertDoesNotExist()
     }
 }

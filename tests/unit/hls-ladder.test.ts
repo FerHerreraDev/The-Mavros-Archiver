@@ -32,12 +32,26 @@ describe('escalera de calidades (VID-06, VID-08)', () => {
     expect(rungs[0].width).toBe(w)
     for (const r of rungs) {
       expect(r.width).toBeLessThanOrEqual(w)
-      expect(r.maxrateKbps).toBe(CAP[r.name])
+      expect(r.maxrateKbps).toBe(CAP[label(r.width)])
     }
     for (let i = 1; i < rungs.length; i++) {
       expect(rungs[i].width).toBeLessThan(rungs[i - 1].width)
       expect(rungs[i].maxrateKbps).toBeLessThanOrEqual(rungs[i - 1].maxrateKbps)
     }
+  })
+
+  it.each([3840, 2560, 1920, 1782, 1440, 1280, 1000, 854, 700])('VID-01 original de %i px: cada calidad en su propia carpeta', (w) => {
+    const names = ladder(w).map((r: Rung) => r.name)
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('VID-01 un original entre escalones (1782 de ancho) va en "original", no en otra "720p"', () => {
+    expect(ladder(1782).map((r: Rung) => [r.width, r.name])).toEqual([
+      [1782, 'original'],
+      [1280, '720p'],
+      [854, '480p'],
+      [640, '360p'],
+    ])
   })
 
   it('el nombre va por ancho (1920×800 en 2.39:1 sigue siendo 1080p)', () => {

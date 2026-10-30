@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.outlined.HighQuality
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,12 +49,15 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.mavros.archiver.core.android.player.NEXT_EPISODE_COUNTDOWN_SECONDS
+import com.mavros.archiver.core.android.player.TrackChoices
 import com.mavros.archiver.core.design.MavrosColors
 import com.mavros.archiver.core.android.player.UpNext
 import com.mavros.archiver.core.model.formatTimestamp
 import kotlinx.coroutines.delay
 
 const val AUTO_HIDE_MS = 5_000L
+
+private enum class TvDialog { Quality, Audio, Subtitles }
 
 /**
  * Controles del reproductor de la tele (TV-06). Visibles: las flechas se mueven entre los botones
@@ -75,12 +80,16 @@ fun TvPlayerControls(
     /** Cambia con cada tecla de la actividad: reinicia el temporizador */
     interaction: Int,
     onAutoHide: () -> Unit,
+    tracks: TrackChoices = TrackChoices(),
+    onSelectAudio: (String) -> Unit = {},
+    /** null = apagados */
+    onSelectSubtitles: (String?) -> Unit = {},
 ) {
-    var picking by remember { mutableStateOf(false) }
+    var dialog by remember { mutableStateOf<TvDialog?>(null) }
 
-    // Se ocultan solos tras 5 s sin tocar nada mientras reproduce; con la lista de calidades abierta, no
-    LaunchedEffect(visible, interaction, isPlaying, picking) {
-        if (visible && isPlaying && !picking) {
+    // Se ocultan solos tras 5 s sin tocar nada mientras reproduce; con una lista abierta (calidad, audio, subtítulos), no
+    LaunchedEffect(visible, interaction, isPlaying, dialog) {
+        if (visible && isPlaying && dialog == null) {
             delay(AUTO_HIDE_MS)
             onAutoHide()
         }
@@ -126,7 +135,7 @@ fun TvPlayerControls(
                     }
                     Spacer(Modifier.width(8.dp))
                     if (qualities.size > 1) {
-                        IconButton(onClick = { picking = true }, modifier = Modifier.testTag("tv-quality")) {
+                        IconButton(onClick = { dialog = TvDialog.Quality }, modifier = Modifier.testTag("tv-quality")) {
                             Icon(Icons.Outlined.HighQuality, contentDescription = "Calidad")
                         }
                         Text(
@@ -134,14 +143,77 @@ fun TvPlayerControls(
                             color = MavrosColors.MutedForeground,
                         )
                     }
+                    // Idiomas (TV-09): solo si la película los tiene
+                    if (tracks.audio.size > 1) {
+                        IconButton(onClick = { dialog = TvDialog.Audio }, modifier = Modifier.testTag("tv-audio")) {
+                            Icon(Icons.Outlined.Language, contentDescription = "Audio")
+                        }
+                        Text(tracks.audio.firstOrNull { it.language == tracks.selectedAudio }?.label ?: "Audio", color = MavrosColors.MutedForeground)
+                    }
+                    if (tracks.subtitles.isNotEmpty()) {
+                        IconButton(onClick = { dialog = TvDialog.Subtitles }, modifier = Modifier.testTag("tv-subtitles")) {
+                            Icon(Icons.Outlined.Subtitles, contentDescription = "Subtítulos")
+                        }
+                        Text(tracks.subtitles.firstOrNull { it.language == tracks.selectedSubtitles }?.label ?: "Desactivados", color = MavrosColors.MutedForeground)
+                    }
                 }
             }
         }
     }
 
-    if (picking) QualityDialog(qualities, selectedQuality, onDismiss = { picking = false }) {
-        onSelectQuality(it)
-        picking = false
+    when (dialog) {
+        TvDialog.Quality -> QualityDialog(qualities, selectedQuality, onDismiss = { dialog = null }) {
+            onSelectQuality(it)
+            dialog = null
+        }
+        TvDialog.Audio -> ChoiceDialog(
+            "Audio",
+            tracks.audio.map { Choice("tv-audio-${it.language}", it.label, it.language == tracks.selectedAudio) },
+            onDismiss = { dialog = null },
+        ) {
+            onSelectAudio(tracks.audio[it].language)
+            dialog = null
+        }
+        TvDialog.Subtitles -> ChoiceDialog(
+            "Subtítulos",
+            listOf(Choice("tv-subtitles-off", "Desactivados", tracks.selectedSubtitles == null)) +
+                tracks.subtitles.map { Choice("tv-subtitles-${it.language}", it.label, it.language == tracks.selectedSubtitles) },
+            onDismiss = { dialog = null },
+        ) {
+            onSelectSubtitles(if (it == 0) null else tracks.subtitles[it - 1].language)
+            dialog = null
+        }
+        null -> Unit
+    }
+}
+
+private data class Choice(val tag: String, val label: String, val selected: Boolean)
+
+/** Lista de idiomas enfocable con el control; el foco empieza en el elegido (TV-09) */
+@Composable
+private fun ChoiceDialog(title: String, choices: List<Choice>, onDismiss: () -> Unit, onSelect: (Int) -> Unit) {
+    val first = remember { FocusRequester() }
+    val start = choices.indexOfFirst { it.selected }.coerceAtLeast(0)
+    Dialog(onDismissRequest = onDismiss) {
+        Column(Modifier.background(MavrosColors.Card).padding(24.dp).width(360.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MavrosColors.Foreground)
+            Spacer(Modifier.height(12.dp))
+            choices.forEachIndexed { index, choice ->
+                val focus = if (index == start) Modifier.focusRequester(first) else Modifier
+                ListItem(
+                    selected = choice.selected,
+                    onClick = { onSelect(index) },
+                    headlineContent = { Text(choice.label) },
+                    modifier = focus.testTag(choice.tag),
+                )
+            }
+        }
+        LaunchedEffect(Unit) {
+            repeat(30) {
+                withFrameNanos { }
+                if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
+            }
+        }
     }
 }
 

@@ -65,6 +65,8 @@ class PlaybackSession(
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
             .build()
+        // Idiomas recordados en el dispositivo; los subtítulos arrancan apagados (MOB-20)
+        exo.trackSelectionParameters = TrackPreferences(context).applyTo(exo.trackSelectionParameters)
         attach(exo)
         return exo
     }

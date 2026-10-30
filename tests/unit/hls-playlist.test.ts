@@ -84,6 +84,11 @@ describe('validateLadder', () => {
     expect(validateLadder(variants, goodMedias(), source).some((e) => e.includes('sin CODECS'))).toBe(true)
   })
 
+  it('VID-01 dos calidades con la misma playlist (original entre escalones) → error', () => {
+    const variants = parseMaster(MASTER.replace('1080p/index.m3u8', '720p/index.m3u8'))
+    expect(validateLadder(variants, goodMedias(), source)).toContain('VID-01 hay calidades que apuntan a la misma playlist')
+  })
+
   it('VID-02 sin ENDLIST o sin VOD → error', () => {
     const medias = { ...goodMedias(), '720p/index.m3u8': parseMedia(media(GOOD, { end: false, vod: false })) }
     const errors = validateLadder(parseMaster(MASTER), medias, source)

@@ -22,6 +22,7 @@ export interface Env {
 const TYPES: Record<string, { contentType: string; cacheControl: string }> = {
   '.m3u8': { contentType: 'application/vnd.apple.mpegurl', cacheControl: 'private, max-age=60' },
   '.ts': { contentType: 'video/mp2t', cacheControl: 'private, max-age=31536000, immutable' },
+  '.vtt': { contentType: 'text/vtt; charset=utf-8', cacheControl: 'private, max-age=31536000, immutable' },
 }
 
 const CORS = {

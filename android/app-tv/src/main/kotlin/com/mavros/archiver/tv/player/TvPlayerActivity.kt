@@ -48,6 +48,11 @@ import com.mavros.archiver.core.android.player.PlaybackSession
 import com.mavros.archiver.core.android.player.PlayerUiState
 import com.mavros.archiver.core.android.player.PlayerViewModel
 import com.mavros.archiver.core.android.player.UpNext
+import com.mavros.archiver.core.android.player.TrackChoices
+import com.mavros.archiver.core.android.player.TrackPreferences
+import com.mavros.archiver.core.android.player.withAudio
+import com.mavros.archiver.core.android.player.withSubtitles
+import com.mavros.archiver.core.model.TrackRules
 import com.mavros.archiver.core.design.MavrosLoader
 import com.mavros.archiver.core.model.Movie
 import com.mavros.archiver.tv.MavrosTvTheme
@@ -119,6 +124,8 @@ class TvPlayerActivity : ComponentActivity() {
     private var durationMs by mutableLongStateOf(0L)
     private var videoHeights by mutableStateOf(emptyList<Int>())
     private var selectedHeight by mutableStateOf<Int?>(null)
+    private var tracks by mutableStateOf(TrackChoices())
+    private val trackPreferences by lazy { TrackPreferences(this) }
     /** Cambia con cada tecla: reinicia el temporizador que oculta los controles */
     private var interaction by mutableIntStateOf(0)
     /** Aviso breve "12:34 / 1:39:12" al adelantar/atrasar con los controles ocultos */
@@ -147,6 +154,7 @@ class TvPlayerActivity : ComponentActivity() {
             override fun onTracksChanged(tracks: Tracks) {
                 videoHeights = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
                     .flatMap { g -> (0 until g.length).map { g.getTrackFormat(it).height } }
+                this@TvPlayerActivity.tracks = TrackChoices.of(tracks)
             }
         })
 
@@ -221,6 +229,9 @@ class TvPlayerActivity : ComponentActivity() {
                                     onSelectQuality = ::selectQuality,
                                     interaction = interaction,
                                     onAutoHide = { controlsVisible = false },
+                                    tracks = tracks,
+                                    onSelectAudio = ::selectAudio,
+                                    onSelectSubtitles = ::selectSubtitles,
                                 )
                                 val upNext = next?.takeIf { ended && !nextCancelled }
                                 nextVisible = upNext != null
@@ -288,6 +299,18 @@ class TvPlayerActivity : ComponentActivity() {
             durationMs = player.duration.coerceAtLeast(0)
             seekHint = "${formatTimestamp(positionMs / 1000.0)} / ${formatTimestamp(durationMs / 1000.0)}"
         }
+    }
+
+    /** Igual que el teléfono (MOB-20): se aplica y se recuerda en la tele */
+    private fun selectAudio(language: String) {
+        trackPreferences.audioLanguage = language
+        player.trackSelectionParameters = player.trackSelectionParameters.withAudio(language)
+    }
+
+    /** null = apagados */
+    private fun selectSubtitles(language: String?) {
+        trackPreferences.subtitlesLanguage = language ?: TrackRules.OFF
+        player.trackSelectionParameters = player.trackSelectionParameters.withSubtitles(language)
     }
 
     /** Igual que el teléfono (MOB-14): una resolución fija o "Automática" */

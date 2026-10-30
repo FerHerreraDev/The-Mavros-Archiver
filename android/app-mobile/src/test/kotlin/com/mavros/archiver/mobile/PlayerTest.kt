@@ -22,6 +22,8 @@ import com.mavros.archiver.mobile.player.PlayerScreen
 import com.mavros.archiver.core.android.player.PlayerUiState
 import com.mavros.archiver.core.android.player.PlayerViewModel
 import com.mavros.archiver.core.android.player.qualityLabels
+import com.mavros.archiver.core.android.player.TrackChoices
+import com.mavros.archiver.core.model.TrackOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -127,9 +129,12 @@ class PlayerTest {
         qualities: List<Pair<Int?, String>> = qualityLabels(listOf(1080, 720)),
         onRetry: () -> Unit = {},
         onQuality: (Int?) -> Unit = {},
+        tracks: TrackChoices = TrackChoices(),
+        onAudio: (String) -> Unit = {},
+        onSubtitles: (String?) -> Unit = {},
     ) = compose.setContent {
         MavrosTheme {
-            PlayerScreen(state, "Chainsaw Man", inPip, controls, buffering, failed, qualities, null, onQuality, {}, onRetry) {
+            PlayerScreen(state, "Chainsaw Man", inPip, controls, buffering, failed, qualities, null, onQuality, {}, onRetry, tracks, onAudio, onSubtitles) {
                 Box(Modifier.fillMaxSize().testTag("video")) // como PlayerView: ocupa la pantalla
             }
         }
@@ -188,5 +193,41 @@ class PlayerTest {
     @Test fun `MOB-14 la barra se oculta con los controles`() {
         screen(PlayerUiState.Ready(source), controls = false)
         compose.onNodeWithText("Chainsaw Man").assertDoesNotExist()
+    }
+
+    private val languages = TrackChoices(
+        audio = listOf(TrackOption("es", "Español"), TrackOption("en", "Inglés")),
+        selectedAudio = "es",
+        subtitles = listOf(TrackOption("es", "Español")),
+        selectedSubtitles = null,
+    )
+
+    @Test fun `MOB-20 audio y subtitulos - elegir ingles y prender los subtitulos`() {
+        var audio: String? = null
+        var subtitles: String? = "sin tocar"
+        screen(PlayerUiState.Ready(source), tracks = languages, onAudio = { audio = it }, onSubtitles = { subtitles = it })
+        compose.onNodeWithTag("languages").performClick()
+        compose.onNodeWithText("Audio").assertIsDisplayed()
+        compose.onNodeWithTag("subtitles-off").assertIsDisplayed()
+        compose.onNodeWithTag("audio-en").performClick()
+        assertEquals("en", audio)
+        compose.onNodeWithTag("languages").performClick()
+        compose.onNodeWithTag("subtitles-es").performClick()
+        assertEquals("es", subtitles)
+        compose.onNodeWithTag("languages").performClick()
+        compose.onNodeWithTag("subtitles-off").performClick()
+        assertEquals(null, subtitles)
+    }
+
+    @Test fun `MOB-20 sin idiomas que elegir no hay boton`() {
+        screen(PlayerUiState.Ready(source), tracks = TrackChoices(audio = listOf(TrackOption("en", "Inglés")), selectedAudio = "en"))
+        compose.onNodeWithTag("languages").assertDoesNotExist()
+    }
+
+    @Test fun `MOB-20 solo subtitulos - el boton aparece sin seccion de audio`() {
+        screen(PlayerUiState.Ready(source), tracks = TrackChoices(audio = listOf(TrackOption("en", "Inglés")), selectedAudio = "en", subtitles = listOf(TrackOption("es", "Español"))))
+        compose.onNodeWithTag("languages").performClick()
+        compose.onNodeWithTag("subtitles-es").assertIsDisplayed()
+        compose.onNodeWithTag("audio-en").assertDoesNotExist()
     }
 }

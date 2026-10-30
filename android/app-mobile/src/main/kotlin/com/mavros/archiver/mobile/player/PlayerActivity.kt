@@ -1,6 +1,11 @@
 package com.mavros.archiver.mobile.player
 
 import com.mavros.archiver.core.android.player.PlayerUiState
+import com.mavros.archiver.core.android.player.TrackChoices
+import com.mavros.archiver.core.android.player.TrackPreferences
+import com.mavros.archiver.core.android.player.withAudio
+import com.mavros.archiver.core.android.player.withSubtitles
+import com.mavros.archiver.core.model.TrackRules
 import com.mavros.archiver.core.android.player.PlayerViewModel
 import com.mavros.archiver.core.android.player.UpNext
 import com.mavros.archiver.core.android.player.qualityLabels
@@ -83,6 +88,8 @@ class PlayerActivity : ComponentActivity() {
     private var playbackFailed by mutableStateOf(false)
     private var videoHeights by mutableStateOf(emptyList<Int>())
     private var selectedHeight by mutableStateOf<Int?>(null)
+    private var tracks by mutableStateOf(TrackChoices())
+    private val trackPreferences by lazy { TrackPreferences(this) }
     private var ended by mutableStateOf(false)
     private var nextCancelled by mutableStateOf(false)
 
@@ -98,7 +105,10 @@ class PlayerActivity : ComponentActivity() {
             ended = state == Player.STATE_ENDED
         }
         override fun onPlayerError(error: PlaybackException) { playbackFailed = true }
-        override fun onTracksChanged(tracks: Tracks) { videoHeights = heightsOf(tracks) }
+        override fun onTracksChanged(tracks: Tracks) {
+            videoHeights = heightsOf(tracks)
+            this@PlayerActivity.tracks = TrackChoices.of(tracks)
+        }
         override fun onIsPlayingChanged(isPlaying: Boolean) { updatePipParams(isPlaying) }
     }
 
@@ -158,6 +168,9 @@ class PlayerActivity : ComponentActivity() {
                             controller?.play()
                         } else vm.retry()
                     },
+                    tracks = tracks,
+                    onSelectAudio = ::selectAudio,
+                    onSelectSubtitles = ::selectSubtitles,
                     nextEpisode = next?.takeIf { ended && !nextCancelled && !inPip },
                     onPlayNext = ::playNext,
                     onCancelNext = { nextCancelled = true },
@@ -215,6 +228,7 @@ class PlayerActivity : ComponentActivity() {
             val c = runCatching { future.get() }.getOrNull() ?: return@addListener
             c.addListener(listener)
             videoHeights = heightsOf(c.currentTracks)
+            tracks = TrackChoices.of(c.currentTracks)
             controller = c
         }, ContextCompat.getMainExecutor(this))
     }
@@ -258,6 +272,21 @@ class PlayerActivity : ComponentActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         inPip = isInPictureInPictureMode
+    }
+
+    // --- Audio y subtítulos (MOB-20) -------------------------------------
+
+    private fun selectAudio(language: String) {
+        val c = controller ?: return
+        trackPreferences.audioLanguage = language
+        c.trackSelectionParameters = c.trackSelectionParameters.withAudio(language)
+    }
+
+    /** null = apagados */
+    private fun selectSubtitles(language: String?) {
+        val c = controller ?: return
+        trackPreferences.subtitlesLanguage = language ?: TrackRules.OFF
+        c.trackSelectionParameters = c.trackSelectionParameters.withSubtitles(language)
     }
 
     // --- Calidad (MOB-14) -------------------------------------------------

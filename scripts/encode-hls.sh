@@ -6,7 +6,8 @@
 # - Calidades: la original + 1080p/720p/480p/360p (solo las menores), con CRF y tope de bitrate
 #   por resolución (VID-08, scripts/hls-ladder.mjs)
 # - Keyframe cada 6 s exactos y sin cortes por escena -> segmentos de 6 s alineados entre calidades
-# - Audio copiado sin recodificar (no pierde calidad)
+# - Audio copiado sin recodificar (no pierde calidad); con varios idiomas, cada uno es una pista aparte
+#   (VID-11) y los subtítulos de texto pasan a WebVTT apagados por defecto (VID-12, scripts/hls-tracks.mjs)
 # - [segundos] opcional: codifica solo ese tramo (para pruebas rápidas)
 set -euo pipefail
 
@@ -28,19 +29,36 @@ while read -r w name crf rate; do
   WIDTHS+=("$w"); NAMES+=("$name"); CRFS+=("$crf"); MAXRATES+=("$rate")
 done < <(node "$(dirname "$0")/hls-ladder.mjs" "$WIDTH")
 N=${#WIDTHS[@]}
+# Pistas de audio: con más de una, van aparte y cada calidad es solo video (VID-11)
+AUDIOS=$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$IN" | grep -c . || true)
 
 FILTER="[0:v]split=$N$(for i in $(seq 0 $((N-1))); do printf '[s%d]' "$i"; done)"
 MAPS=() RATES=() STREAM_MAP=""
 for i in $(seq 0 $((N-1))); do
   if (( i == 0 )); then FILTER+=";[s0]null[o0]"
   else FILTER+=";[s$i]scale=${WIDTHS[$i]}:-2:flags=lanczos[o$i]"; fi
-  MAPS+=(-map "[o$i]" -map 0:a:0)
   RATES+=("-crf:v:$i" "${CRFS[$i]}" "-maxrate:v:$i" "${MAXRATES[$i]}k" "-bufsize:v:$i" "$(( MAXRATES[$i] * 2 ))k")
-  STREAM_MAP+="v:$i,a:$i,name:${NAMES[$i]} "
+  if (( AUDIOS > 1 )); then
+    MAPS+=(-map "[o$i]")
+    STREAM_MAP+="v:$i,agroup:audio,name:${NAMES[$i]} "
+  else
+    MAPS+=(-map "[o$i]" -map 0:a:0)
+    STREAM_MAP+="v:$i,a:$i,name:${NAMES[$i]} "
+  fi
 done
+if (( AUDIOS > 1 )); then
+  AUDIO_MAP=""
+  for a in $(seq 0 $((AUDIOS-1))); do
+    MAPS+=(-map "0:a:$a")
+    AUDIO_MAP+="a:$a,agroup:audio,name:audio-$a"
+    if (( a == 0 )); then AUDIO_MAP+=",default:yes"; fi
+    AUDIO_MAP+=" "
+  done
+  STREAM_MAP="$AUDIO_MAP$STREAM_MAP"
+fi
 
 mkdir -p "$OUT"
-echo "Calidades: ${NAMES[*]} | keyint=$KEYINT (${SEGMENT}s) | preset=$PRESET"
+echo "Calidades: ${NAMES[*]} | audios: $AUDIOS | keyint=$KEYINT (${SEGMENT}s) | preset=$PRESET"
 
 ffmpeg -hide_banner -nostdin -y ${LIMIT:+-t "$LIMIT"} -i "$IN" \
   -filter_complex "$FILTER" "${MAPS[@]}" \
@@ -54,4 +72,5 @@ ffmpeg -hide_banner -nostdin -y ${LIMIT:+-t "$LIMIT"} -i "$IN" \
   -var_stream_map "${STREAM_MAP% }" \
   "$OUT/%v/index.m3u8"
 
+node "$(dirname "$0")/hls-tracks.mjs" "$IN" "$OUT" ${LIMIT:+"$LIMIT"}
 echo "Listo: $OUT/master.m3u8"

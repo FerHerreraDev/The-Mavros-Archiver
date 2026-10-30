@@ -1,6 +1,7 @@
 package com.mavros.archiver.mobile.player
 
 import com.mavros.archiver.core.android.player.PlayerUiState
+import com.mavros.archiver.core.android.player.TrackChoices
 import com.mavros.archiver.core.android.player.PlayerViewModel
 import com.mavros.archiver.core.android.player.qualityLabels
 
@@ -20,11 +21,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.HighQuality
+import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.VideocamOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -75,6 +79,9 @@ fun PlayerScreen(
     onSelectQuality: (Int?) -> Unit,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    tracks: TrackChoices = TrackChoices(),
+    onSelectAudio: (String) -> Unit = {},
+    onSelectSubtitles: (String?) -> Unit = {},
     nextEpisode: UpNext? = null,
     onPlayNext: (UpNext) -> Unit = {},
     onCancelNext: () -> Unit = {},
@@ -95,14 +102,16 @@ fun PlayerScreen(
             }
         }
 
-        // Barra de arriba: atrás, título y calidad. Se esconde con los controles y en PiP.
+        // Barra de arriba: atrás, título, idiomas y calidad. Se esconde con los controles y en PiP.
         AnimatedVisibility(
             visible = !inPip && (controlsVisible || state !is PlayerUiState.Ready),
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopStart),
         ) {
-            TopBar(title, state is PlayerUiState.Ready && qualities.size > 1, qualities, selectedQuality, onSelectQuality, onBack)
+            TopBar(title, state is PlayerUiState.Ready && qualities.size > 1, qualities, selectedQuality, onSelectQuality, onBack) {
+                if (state is PlayerUiState.Ready && tracks.hasChoices) LanguageButton(tracks, onSelectAudio, onSelectSubtitles)
+            }
         }
 
         nextEpisode?.let { NextEpisodeCard(it, onPlayNext, onCancelNext, Modifier.align(Alignment.BottomEnd)) }
@@ -147,6 +156,7 @@ private fun TopBar(
     selected: Int?,
     onSelect: (Int?) -> Unit,
     onBack: () -> Unit,
+    actions: @Composable () -> Unit = {},
 ) {
     var picking by remember { mutableStateOf(false) }
     Row(
@@ -166,6 +176,7 @@ private fun TopBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).testTag("player-title"),
         )
+        actions()
         if (showQuality) {
             IconButton(onClick = { picking = true }, modifier = Modifier.testTag("quality")) {
                 Icon(Icons.Outlined.HighQuality, contentDescription = "Calidad", tint = Color.White)
@@ -188,6 +199,47 @@ private fun TopBar(
             },
             confirmButton = { TextButton(onClick = { picking = false }) { Text("Cerrar") } },
         )
+    }
+}
+
+/** Audio y subtítulos (MOB-20): un diálogo con cada idioma; los subtítulos se pueden apagar */
+@Composable
+private fun LanguageButton(tracks: TrackChoices, onSelectAudio: (String) -> Unit, onSelectSubtitles: (String?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    IconButton(onClick = { picking = true }, modifier = Modifier.testTag("languages")) {
+        Icon(Icons.Outlined.Subtitles, contentDescription = "Audio y subtítulos", tint = Color.White)
+    }
+    if (!picking) return
+    AlertDialog(
+        onDismissRequest = { picking = false },
+        title = { Text("Audio y subtítulos") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (tracks.audio.size > 1) {
+                    Text("Audio", style = MaterialTheme.typography.titleSmall)
+                    tracks.audio.forEach { option ->
+                        Choice(option.label, option.language == tracks.selectedAudio, "audio-${option.language}") { onSelectAudio(option.language); picking = false }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (tracks.subtitles.isNotEmpty()) {
+                    Text("Subtítulos", style = MaterialTheme.typography.titleSmall)
+                    Choice("Desactivados", tracks.selectedSubtitles == null, "subtitles-off") { onSelectSubtitles(null); picking = false }
+                    tracks.subtitles.forEach { option ->
+                        Choice(option.label, option.language == tracks.selectedSubtitles, "subtitles-${option.language}") { onSelectSubtitles(option.language); picking = false }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { picking = false }) { Text("Cerrar") } },
+    )
+}
+
+@Composable
+private fun Choice(label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag(tag)) {
+        Text(label, modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+        if (selected) Icon(Icons.Outlined.Check, contentDescription = "Elegido")
     }
 }
 

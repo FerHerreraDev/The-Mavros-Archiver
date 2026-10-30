@@ -27,7 +27,12 @@ export function ladder(sourceWidth) {
     const { name, crf, maxrateKbps } = tier(width)
     return { width, name, crf, maxrateKbps }
   }
-  return [rung(sourceWidth), ...BELOW.filter((w) => w < sourceWidth).map(rung)]
+  const below = BELOW.filter((w) => w < sourceWidth).map(rung)
+  const top = rung(sourceWidth)
+  // Un original entre escalones (1782 de ancho) se llamaría igual que el de abajo ("720p") y las
+  // dos calidades se escribirían en la misma carpeta: el original va en "original"
+  if (below.some((r) => r.name === top.name)) top.name = 'original'
+  return [top, ...below]
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
