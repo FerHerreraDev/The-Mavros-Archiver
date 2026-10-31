@@ -43,8 +43,8 @@ android {
         applicationId = "com.mavros.archiver.tv"
         minSdk = 28 // Android TV 9+: cualquier Google TV
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.1.2"
+        versionCode = 6
+        versionName = "1.2.0"
     }
 
     signingConfigs {
