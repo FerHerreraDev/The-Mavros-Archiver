@@ -2,10 +2,10 @@ import Foundation
 import MavrosModel
 import Supabase
 
-let cardFields = "id, slug, title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status, series_id, season_number, episode_number"
+let cardFields = "id, slug, title, original_title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status, series_id, season_number, episode_number"
 /// Episodios en la página de la serie: además su sinopsis (SER-18)
 let episodeFields = cardFields + ", synopsis"
-let seriesFields = "id, slug, title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, status"
+let seriesFields = "id, slug, title, original_title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, status"
 
 struct ProgressRow: Decodable {
     let positionSeconds: Double

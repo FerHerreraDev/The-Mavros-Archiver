@@ -29,10 +29,10 @@ interface CatalogRepository {
     suspend fun nextEpisode(movieId: String): DataResult<Movie?>
 }
 
-private const val CARD_FIELDS = "id, slug, title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status, series_id, season_number, episode_number"
+private const val CARD_FIELDS = "id, slug, title, original_title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status, series_id, season_number, episode_number"
 /** Episodios en la página de la serie: además su sinopsis (SER-18) */
 private const val EPISODE_FIELDS = "$CARD_FIELDS, synopsis"
-private const val SERIES_FIELDS = "id, slug, title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status"
+private const val SERIES_FIELDS = "id, slug, title, original_title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, published_at, status"
 
 @Serializable
 private data class ProgressEntry(

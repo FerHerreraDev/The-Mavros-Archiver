@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MavrosTheme {
-                MavrosNavHost(container)
+                MavrosNavHost(container, (application as MavrosApplication).downloads)
             }
         }
     }
@@ -28,6 +28,12 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         // Al volver a la app se confirma con el servidor que la sesión sigue valiendo (MOB-06)
-        lifecycleScope.launch { container.auth.validateSession() }
+        lifecycleScope.launch {
+            if (container.auth.validateSession()) {
+                // Con conexión: se manda lo visto sin internet y se borra lo despublicado (DL-05, DL-06)
+                container.offlineProgress?.flush()
+                (application as MavrosApplication).downloads.prune()
+            }
+        }
     }
 }

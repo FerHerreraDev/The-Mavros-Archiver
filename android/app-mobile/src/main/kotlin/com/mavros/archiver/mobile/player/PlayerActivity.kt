@@ -134,7 +134,10 @@ class PlayerActivity : ComponentActivity() {
                 // Una por película: al pasar al siguiente episodio se pide su propia URL (SER-16)
                 val listId = intent.getStringExtra(LIST_ID)
                 val vm: PlayerViewModel = viewModel(key = movie.id, factory = viewModelFactory {
-                    initializer { PlayerViewModel(container.playback, movie.id, container.catalog, container.playlists, listId) }
+                    initializer {
+                        val downloads = (application as MavrosApplication).downloads
+                        PlayerViewModel(container.playback, movie.id, container.catalog, container.playlists, listId, local = downloads::localSource)
+                    }
                 })
                 val state by vm.state.collectAsStateWithLifecycle()
                 val next by vm.next.collectAsStateWithLifecycle()

@@ -25,7 +25,8 @@
     "video:url": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/video-url.ts",
     "android:test": "cd android && ./gradlew :core:model:test :core:data:test :app-mobile:testLocalDebugUnitTest :app-tv:testLocalDebugUnitTest :core:data:integrationTest",
     "android:e2e": "android/scripts/e2e-emulator.sh",
-    "android:e2e:tv": "android/scripts/e2e-tv.sh"
+    "android:e2e:tv": "android/scripts/e2e-tv.sh",
+    "android:release": "node scripts/android-release.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

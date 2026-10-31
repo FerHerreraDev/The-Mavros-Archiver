@@ -150,3 +150,58 @@ struct LoginAndTracker {
         #expect(t.onExit(position: 500, nowMs: 12_000) == 100, "dentro de 0…duración")
     }
 }
+
+@Suite("Búsqueda: mismos casos que la web y Android (SRCH-01, IPAD-12)")
+struct SearchCases {
+    struct Item: Decodable, Equatable { let title: String; let original_title: String? }
+    struct Case: Decodable { let name: String; let items: [Item]; let query: String; let expected: [Int] }
+    struct Cases: Decodable { let cases: [Case] }
+
+    @Test func shared() throws {
+        let shared = try JSONDecoder().decode(Cases.self, from: fixture("search-cases.json"))
+        #expect(!shared.cases.isEmpty)
+        for c in shared.cases {
+            #expect(SearchRules.search(c.items, query: c.query) { [$0.title, $0.original_title] } == c.expected.map { c.items[$0] }, "\(c.name)")
+        }
+    }
+
+    @Test func catalogSkipsLooseEpisodes() {
+        let film = Movie(id: "1", title: "Arcane la película", durationSeconds: 10)
+        let episode = Movie(id: "2", title: "Arcane episodio", durationSeconds: 10, seriesId: "s", seasonNumber: 1, episodeNumber: 1)
+        let show = CatalogSeries(series: Series(id: "s", title: "Arcane"), seasons: 1, episodes: 9)
+        let hits = SearchRules.searchCatalog(Catalog(genres: [], recent: [film, episode], continueWatching: [], series: [show]), query: "arcane")
+        #expect(hits == [.movie(film), .series(show)])
+    }
+}
+
+@Suite("Descargas: mismas reglas que Android (DL-01, DL-05, IPAD-13)")
+struct DownloadRulesTests {
+    @Test func pickHeight() {
+        #expect(DownloadRules.pickHeight([1080, 720, 480, 360]) == 720)
+        #expect(DownloadRules.pickHeight([782, 562, 374, 280]) == 562)
+        #expect(DownloadRules.pickHeight([2160, 1080]) == 1080)
+        #expect(DownloadRules.pickHeight([]) == nil)
+    }
+
+    @Test func pickFromMaster() {
+        let master = """
+        #EXTM3U
+        #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Español",LANGUAGE="es",DEFAULT=YES,URI="audio-0/index.m3u8"
+        #EXT-X-STREAM-INF:BANDWIDTH=3440000,RESOLUTION=1782x782,CODECS="avc1.640028,mp4a.40.2",AUDIO="audio"
+        original/index.m3u8
+        #EXT-X-STREAM-INF:BANDWIDTH=3420000,RESOLUTION=1280x562,AUDIO="audio"
+        720p/index.m3u8
+        #EXT-X-STREAM-INF:BANDWIDTH=1520000,RESOLUTION=854x374,AUDIO="audio"
+        480p/index.m3u8
+        """
+        #expect(DownloadRules.variants(master: master).count == 3)
+        #expect(DownloadRules.pick(master: master) == .init(height: 562, bandwidth: 3_420_000))
+        #expect(DownloadRules.pick(master: "#EXTM3U") == nil)
+    }
+
+    @Test func shouldUpload() {
+        #expect(DownloadRules.shouldUpload(localUpdatedAtMs: 2, serverUpdatedAtMs: nil))
+        #expect(DownloadRules.shouldUpload(localUpdatedAtMs: 2, serverUpdatedAtMs: 1))
+        #expect(!DownloadRules.shouldUpload(localUpdatedAtMs: 1, serverUpdatedAtMs: 2))
+    }
+}

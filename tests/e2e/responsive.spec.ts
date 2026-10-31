@@ -29,12 +29,12 @@ test('UI-01 sin scroll horizontal en móvil y navbar accesible', async ({ page }
   expect(await hasHorizontalScroll(page), '/login').toBe(false)
 
   await loginAs(page, admin)
-  for (const path of ['/dashboard', `/dashboard/watch/${slug}`, '/dashboard/profile', '/dashboard/admin', '/dashboard/admin/movies']) {
+  for (const path of ['/dashboard', `/dashboard/watch/${slug}`, '/dashboard/profile', '/dashboard/admin', '/dashboard/admin/movies', '/dashboard/requests', '/dashboard/admin/requests', '/dashboard?q=zzz']) {
     await page.goto(path)
     expect(await hasHorizontalScroll(page), path).toBe(false)
   }
 
-  for (const name of [/catálogo/i, /perfil/i, /admin/i]) {
+  for (const name of [/catálogo/i, /mis listas/i, /pedidos/i, /perfil/i, /admin/i]) {
     await expect(page.getByRole('link', { name })).toBeVisible()
   }
   await expect(page.getByRole('button', { name: /salir/i })).toBeVisible()

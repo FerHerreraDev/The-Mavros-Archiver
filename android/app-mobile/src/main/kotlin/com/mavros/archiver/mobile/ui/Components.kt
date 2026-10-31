@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -112,7 +113,7 @@ fun PosterCard(
 
 /** Error con "Reintentar" (MOB-09): nunca se queda cargando para siempre */
 @Composable
-fun ErrorState(error: DataError, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun ErrorState(error: DataError, onRetry: () -> Unit, modifier: Modifier = Modifier, onOpenDownloads: (() -> Unit)? = null) {
     Column(
         modifier.fillMaxSize().padding(32.dp).testTag("error"),
         verticalArrangement = Arrangement.Center,
@@ -131,5 +132,9 @@ fun ErrorState(error: DataError, onRetry: () -> Unit, modifier: Modifier = Modif
         )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onRetry, shape = RoundedCornerShape(999.dp)) { Text("Reintentar") }
+        if (onOpenDownloads != null && error == DataError.Network) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onOpenDownloads, shape = RoundedCornerShape(999.dp), modifier = Modifier.testTag("error-downloads")) { Text("Ver descargas") }
+        }
     }
 }

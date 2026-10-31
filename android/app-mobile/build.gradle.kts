@@ -42,8 +42,10 @@ android {
         applicationId = "com.mavros.archiver"
         minSdk = 28
         targetSdk = 37
-        versionCode = 6
-        versionName = "1.2.0"
+        versionCode = 7
+        versionName = "1.3.0"
+        // Solo para probar la actualización (UPD-04) en un aparato: instala esta misma versión con un número menor
+        (findProperty("mavros.versionCodeOverride") as String?)?.let { versionCode = it.toInt() }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -72,7 +74,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "SUPABASE_URL", "\"http://10.0.2.2:54321\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$localAnonKey\"")
-            buildConfigField("String", "SITE_URL", "\"http://10.0.2.2:3000\"")
+            // -Pmavros.localSiteUrl=… si el 3000 está ocupado (como la tele)
+            buildConfigField("String", "SITE_URL", "\"${(findProperty("mavros.localSiteUrl") as String?) ?: "http://10.0.2.2:3000"}\"")
         }
         create("prod") {
             dimension = "env"

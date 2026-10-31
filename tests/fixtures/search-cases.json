@@ -1,0 +1,18 @@
+{
+  "_doc": "SRCH-01: casos compartidos por la web (tests/unit/search.test.ts), Android (SearchRulesTest) y el iPad (SharedCasesTests). items en el orden del catálogo; expected = índices de items en el orden de los resultados.",
+  "cases": [
+    { "name": "sin acentos ni mayúsculas", "items": [{ "title": "Película de prueba" }, { "title": "Otra cosa" }], "query": "PELICULA", "expected": [0] },
+    { "name": "acento en lo buscado", "items": [{ "title": "Accion total" }], "query": "acción", "expected": [0] },
+    { "name": "la eñe", "items": [{ "title": "El Niño" }], "query": "nino", "expected": [0] },
+    { "name": "guiones y signos", "items": [{ "title": "Spider-Man: No Way Home" }, { "title": "Spiderwick" }], "query": "spider man", "expected": [0] },
+    { "name": "título original", "items": [{ "title": "El diablo viste a la moda 2", "original_title": "The Devil Wears Prada 2" }], "query": "devil", "expected": [0] },
+    { "name": "todas las palabras deben aparecer", "items": [{ "title": "Dune: Parte dos" }, { "title": "Dune" }], "query": "dune dos", "expected": [0] },
+    { "name": "orden: empieza igual, luego palabra que empieza, luego el resto", "items": [{ "title": "Superman" }, { "title": "Iron Man" }, { "title": "Man of Steel" }, { "title": "Mandalorian" }], "query": "man", "expected": [2, 3, 1, 0] },
+    { "name": "el orden del catálogo desempata", "items": [{ "title": "Alien: Romulus" }, { "title": "Aliens" }, { "title": "Alien" }], "query": "alien", "expected": [0, 1, 2] },
+    { "name": "título original que empieza igual cuenta como empezar igual", "items": [{ "title": "Tiburón", "original_title": "Jaws" }, { "title": "La venganza de Jaws" }], "query": "jaws", "expected": [0, 1] },
+    { "name": "búsqueda vacía o solo espacios", "items": [{ "title": "Algo" }], "query": "   ", "expected": [] },
+    { "name": "solo signos", "items": [{ "title": "Algo" }], "query": "¿?", "expected": [] },
+    { "name": "nada coincide", "items": [{ "title": "Hokum" }, { "title": "Sense and Sensibility" }], "query": "matrix", "expected": [] },
+    { "name": "un pedazo de palabra", "items": [{ "title": "Sense and Sensibility" }], "query": "sensib", "expected": [0] }
+  ]
+}

@@ -43,8 +43,10 @@ android {
         applicationId = "com.mavros.archiver.tv"
         minSdk = 28 // Android TV 9+: cualquier Google TV
         targetSdk = 37
-        versionCode = 6
-        versionName = "1.2.0"
+        versionCode = 7
+        versionName = "1.3.0"
+        // Solo para probar la actualización (UPD-04) en un aparato: instala esta misma versión con un número menor
+        (findProperty("mavros.versionCodeOverride") as String?)?.let { versionCode = it.toInt() }
     }
 
     signingConfigs {

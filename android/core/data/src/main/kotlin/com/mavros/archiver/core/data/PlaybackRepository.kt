@@ -73,18 +73,20 @@ class HttpPlaybackRepository(
         DataResult.Failure(e.toDataError())
     }
 
-    private suspend fun request(movieId: String): Pair<HttpStatusCode, String> {
-        val session = client.auth.currentSessionOrNull() ?: return HttpStatusCode.Unauthorized to ""
-        // Token por caducar (dura 1 h): se renueva antes de llamar (MOB-04)
-        if (session.expiresAt.toEpochMilliseconds() - System.currentTimeMillis() < 30_000) {
-            runCatching { client.auth.refreshCurrentSession() }.onFailure { if (it is CancellationException) throw it }
-        }
-        val token = client.auth.currentAccessTokenOrNull() ?: return HttpStatusCode.Unauthorized to ""
-        val res = http.get("${config.siteUrl.trimEnd('/')}/api/playback/$movieId") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-        return res.status to res.bodyAsText()
+    private suspend fun request(movieId: String): Pair<HttpStatusCode, String> =
+        authorizedGet(client, http, "${config.siteUrl.trimEnd('/')}/api/playback/$movieId")
+}
+
+/** GET a la web con el access token de Supabase; sin sesión → 401 sin llamar */
+internal suspend fun authorizedGet(client: SupabaseClient, http: HttpClient, url: String): Pair<HttpStatusCode, String> {
+    val session = client.auth.currentSessionOrNull() ?: return HttpStatusCode.Unauthorized to ""
+    // Token por caducar (dura 1 h): se renueva antes de llamar (MOB-04)
+    if (session.expiresAt.toEpochMilliseconds() - System.currentTimeMillis() < 30_000) {
+        runCatching { client.auth.refreshCurrentSession() }.onFailure { if (it is CancellationException) throw it }
     }
+    val token = client.auth.currentAccessTokenOrNull() ?: return HttpStatusCode.Unauthorized to ""
+    val res = http.get(url) { header(HttpHeaders.Authorization, "Bearer $token") }
+    return res.status to res.bodyAsText()
 }
 
 /** Progreso escrito por el propio cliente bajo RLS (PRG-01, PRG-03): user_id lo pone la base (auth.uid()) */
@@ -107,5 +109,18 @@ class SupabaseProgressRepository(private val client: SupabaseClient) : ProgressR
         throw e
     } catch (e: Throwable) {
         DataResult.Failure(e.toDataError())
+    }
+
+    @Serializable private data class UpdatedAt(@SerialName("movie_id") val movieId: String, @SerialName("updated_at") val updatedAt: String)
+
+    /** updated_at (ms) del progreso guardado de cada película; null si no se pudo preguntar (DL-05) */
+    suspend fun updatedAt(movieIds: List<String>): Map<String, Long>? = try {
+        client.from("watch_progress").select(io.github.jan.supabase.postgrest.query.Columns.raw("movie_id, updated_at")) {
+            filter { isIn("movie_id", movieIds) }
+        }.decodeList<UpdatedAt>().associate { it.movieId to com.mavros.archiver.core.model.SeriesRules.instantOf(it.updatedAt).toEpochMilli() }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        null
     }
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- UPD-05: la app instala sus propias versiones nuevas (el sistema siempre pide confirmación) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <receiver
+            android:name="com.mavros.archiver.core.android.update.InstallResultReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

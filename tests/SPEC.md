@@ -379,7 +379,7 @@ App aparte (`app-tv`) para Google TV / Android TV 9+, con la misma lógica que e
 | TV-05 | Detalle: póster, título, año, duración, géneros, sinopsis y botón "Reproducir" / "Continuar desde mm:ss" (PRG-02), enfocado al abrir. |
 | TV-06 | Reproductor a pantalla completa con las mismas reglas que el teléfono: progreso (MOB-15) y token (MOB-16). Control remoto: con los **controles ocultos**, OK los muestra (enfocando ⏯) y ←/→ adelantan/atrasan 10 s; con los **controles visibles**, las flechas se mueven entre los botones (⏪10, ⏯, ⏩10, **Calidad**) y OK activa el botón enfocado, nunca pausa por su cuenta. Las teclas ⏯/⏪/⏩ del control siempre actúan. Atrás oculta los controles y, si ya están ocultos, sale guardando. Los controles se ocultan solos tras 5 s sin tocar nada mientras reproduce, pero **no** mientras la lista de calidades está abierta. **Calidad** ofrece "Automática" y cada resolución disponible (igual que MOB-14). |
 | TV-07 | Se puede cerrar sesión desde la tele (vuelve a la pantalla del código). |
-| TV-08 | La app aparece en el inicio de Google TV (banner) y solo pide permiso de internet. |
+| TV-08 | La app aparece en el inicio de Google TV (banner) y solo pide permiso de internet y de instalar sus propias actualizaciones (UPD-04). |
 | TV-09 | En la fila de controles, junto a **Calidad**, aparecen **Audio** y **Subtítulos** cuando la película los tiene (MOB-20), con las mismas reglas de control remoto que Calidad (TV-06: no se ocultan los controles con la lista abierta) y la elección se recuerda en la tele. |
 
 ## Estados de carga (web y Android)
@@ -517,3 +517,56 @@ App nativa en `ios/`. Mismo backend que la web y Android (Supabase con la clave 
 | ID | Requisito |
 |---|---|
 | IPAD-10 | Mis listas, una lista con "Reproducir lista" y sus elementos, y "Agregar a lista" en el detalle y en la serie (crear una lista nueva ahí mismo), con las mismas reglas que PL-01..PL-07. |
+
+## Fase U — Actualizaciones de las apps Android
+
+Las apps de teléfono y tele se instalan fuera de Google Play. Cada versión nueva se publica una vez desde la Mac y cada aparato la pide sola al abrir, sin cable ni adb.
+
+| ID | Requisito |
+|---|---|
+| UPD-01 | Tabla `app_releases` (`app` = `mobile` o `tv`, `version_code` > 0, `version_name`, `apk_path`, `sha256`, fecha). Un usuario con sesión puede leerla; nadie puede escribirla desde el cliente (ni admins: se publica con la service role). Un visitante anónimo no puede leerla. Un `version_code` no se repite para la misma app. |
+| UPD-02 | Los APK viven en el bucket **privado** `apps` de Supabase Storage: nadie lo lee ni lo lista desde el cliente. |
+| UPD-03 | `GET /api/app/latest?app=mobile\|tv` con sesión (cookie o `Bearer`) responde la versión más alta de esa app: `version_code`, `version_name`, `sha256` y `url` (enlace firmado del APK que caduca en 15 min), con `Cache-Control: no-store`. Sin versiones → 204. Sin sesión o usuario desactivado → 401. `app` inválida → 400. |
+| UPD-04 | Al abrir la app con sesión (y al volver a ella), se consulta UPD-03. Si hay un `version_code` mayor que el instalado, la app muestra a pantalla completa **"Hay una versión nueva"** con la versión y un botón **Instalar**, y no deja seguir hasta instalarla. Si la consulta falla (sin red, error del servidor) o no hay versión nueva, la app sigue normal: nunca se bloquea por no poder preguntar. |
+| UPD-05 | **Instalar** descarga el APK mostrando el avance, comprueba que su SHA-256 sea el publicado (si no, lo borra y avisa "La descarga llegó dañada" con "Reintentar") y abre el instalador del sistema. Si el aparato no permite instalar desde esta app, lo explica y lleva al ajuste para permitirlo. Si el usuario cancela el instalador, vuelve a la pantalla de UPD-04. |
+| UPD-06 | Regla de UPD-04 (cuándo hay que actualizar), con pruebas: misma versión o menor → no; mayor → sí; sin datos → no. |
+| UPD-07 | `pnpm android:release` compila teléfono y tele en `prodRelease`, revisa los secretos de cada APK (MOB-01), se niega a publicar si el `versionCode` no es mayor que el ya publicado, sube los APK a `apps/<app>/<versionCode>.apk` y registra la versión (UPD-01). |
+
+## Fase B — Búsqueda
+
+| ID | Requisito |
+|---|---|
+| SRCH-01 | Regla compartida (web, Android, iPad, casos en `tests/fixtures/search-cases.json`): sin importar mayúsculas, acentos ni signos ("pelicula" encuentra "Película", "spider man" encuentra "Spider-Man"), cada palabra buscada debe aparecer en el título o en el título original. Busca películas y series publicadas (no episodios sueltos). Primero los títulos que empiezan con lo buscado, luego los que tienen una palabra que empieza con la primera palabra buscada, luego el resto; empates en el orden del catálogo. Búsqueda vacía o solo espacios → nada. |
+| SRCH-02 | Web: el catálogo tiene un campo **Buscar** (`/dashboard?q=…`, queda en la URL). Con texto muestra "Resultados para «…»" con las tarjetas (películas y series) en lugar de las secciones; mientras escribes, los resultados se actualizan sin recargar la página entera. |
+| SRCH-03 | Sin resultados: "No encontramos «…»" y un botón **Pedir «…»** (REQ-03). Aplica a web, teléfono, tele y iPad. |
+| SRCH-04 | Teléfono: lupa en la barra del catálogo → pantalla de búsqueda con el teclado abierto; resultados mientras escribes; tocar uno abre su detalle o su serie. |
+| SRCH-05 | Tele: botón **Buscar** arriba del catálogo (junto a "Mis listas") → campo de texto (teclado o voz del control) y resultados en cuadrícula que se recorren con las flechas; Atrás vuelve al catálogo. |
+
+## Fase R — Pedir películas
+
+| ID | Requisito |
+|---|---|
+| REQ-01 | Tabla `movie_requests` (`user_id` lo pone la base, `title` 1–200 caracteres, `note` opcional ≤ 500, `status` = `pending` / `added` / `rejected`, fechas). Un usuario solo puede crear pedidos propios en `pending`, ver los suyos y borrar los suyos pendientes. Un admin ve todos y cambia el estado. Un usuario no puede cambiar el estado ni ver pedidos ajenos. Un anónimo no puede nada. |
+| REQ-02 | Un usuario no puede tener dos pedidos pendientes con el mismo título (sin importar mayúsculas ni espacios) ni más de 20 pendientes: error claro y no se guarda. |
+| REQ-03 | **Pedir «…»** (SRCH-03) crea el pedido con ese título y avisa "Listo, se lo pedimos al admin" (o el error de REQ-02). Teléfono, tele e iPad lo crean directo con su sesión (RLS). |
+| REQ-04 | Web: `/dashboard/requests` ("Mis pedidos", en el menú) tiene un formulario (título y nota) y la lista de mis pedidos con su estado (Pendiente / Ya está / No se pudo) y la opción de borrar los pendientes. |
+| REQ-05 | Panel: pestaña **Pedidos** (`/dashboard/admin/requests`) con los pedidos de todos (título, nota, quién, cuándo, estado), primero los pendientes, más antiguo primero. Botones **Ya está** y **No se puede**. La pestaña muestra cuántos hay pendientes. Solo admins (como ADM-01). |
+
+## Fase D — Descargas para ver sin internet (teléfono)
+
+| ID | Requisito |
+|---|---|
+| DL-01 | El detalle de una película y cada episodio tienen **Descargar**. Se descarga una sola calidad (la más cercana a 720p sin pasarse; si no hay, la más baja), **todos** los idiomas de audio y los subtítulos. Mientras baja se ve el avance (también en la notificación) y se puede cancelar. |
+| DL-02 | Las descargas siguen aunque se salga de la app o se apague la pantalla, y si el enlace del video caduca (PLY-02) se pide uno nuevo y siguen desde donde iban, sin volver a bajar lo ya bajado. |
+| DL-03 | Pantalla **Descargas** (desde el catálogo y desde la pantalla de error sin conexión) con lo descargado: póster, título, tamaño, estado; tocar reproduce y se puede borrar cada una. |
+| DL-04 | Lo descargado se reproduce **sin internet** (modo avión) con los mismos controles, audio y subtítulos (MOB-20), empezando donde se quedó. |
+| DL-05 | El progreso visto sin internet se guarda en el teléfono y se manda al servidor cuando vuelve la conexión (sin pisar un progreso más nuevo del servidor). |
+| DL-06 | Al cerrar sesión (o si la sesión deja de valer, MOB-06) se borran todas las descargas. Una película que se despublica deja de poder descargarse; la ya descargada se borra la próxima vez que la app confirme con el servidor que ya no está. |
+| DL-07 | La clave de caché de cada archivo ignora el token de la URL (`/t/<token>/`): la misma película bajada con dos enlaces distintos ocupa un solo lugar. Regla con pruebas. |
+
+### iPad
+
+| ID | Requisito |
+|---|---|
+| IPAD-12 | Búsqueda en el catálogo (`searchable`) con la regla SRCH-01, y sin resultados **Pedir «…»** (REQ-03). |
+| IPAD-13 | Descargas como DL-01..DL-06: **Descargar** en el detalle y en cada episodio (misma regla de calidad que DL-01, casos compartidos con Android), pantalla **Descargas** (botón arriba del catálogo), reproducción sin internet desde donde se quedó, progreso visto sin internet que se manda al volver la conexión y borrado al cerrar sesión. El simulador no descarga HLS: esto se prueba en un iPad de verdad. |

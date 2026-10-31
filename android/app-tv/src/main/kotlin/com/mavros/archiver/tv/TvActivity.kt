@@ -37,6 +37,9 @@ import com.mavros.archiver.tv.login.TvLoginScreen
 import com.mavros.archiver.tv.login.TvLoginViewModel
 import com.mavros.archiver.tv.player.TvPlayerActivity
 import com.mavros.archiver.tv.series.TvSeriesScreen
+import com.mavros.archiver.tv.update.TvUpdateGate
+import com.mavros.archiver.tv.search.TvSearchScreen
+import com.mavros.archiver.core.android.search.SearchViewModel
 import com.mavros.archiver.tv.lists.TvAddToList
 import com.mavros.archiver.tv.lists.TvListsScreen
 import com.mavros.archiver.tv.lists.TvPlaylistScreen
@@ -53,6 +56,7 @@ import kotlinx.serialization.Serializable
 @Serializable private data class SeriesRoute(val seriesId: String)
 @Serializable private data object ListsRoute
 @Serializable private data class PlaylistRoute(val playlistId: String)
+@Serializable private data object SearchRoute
 
 class TvActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,7 +99,8 @@ fun TvRoot(container: MavrosContainer) {
             val state by vm.state.collectAsStateWithLifecycle()
             TvLoginScreen(state)
         }
-        is SessionState.SignedIn -> SignedIn(container, s.userId)
+        // Con sesión, primero se confirma que la app esté al día (UPD-04)
+        is SessionState.SignedIn -> TvUpdateGate(container) { SignedIn(container, s.userId) }
     }
 }
 
@@ -116,6 +121,7 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
                 onOpenMovie = { nav.navigate(DetailRoute(it)) },
                 onOpenSeries = { nav.navigate(SeriesRoute(it)) },
                 onOpenLists = { nav.navigate(ListsRoute) },
+                onOpenSearch = { nav.navigate(SearchRoute) },
                 onSignOut = { container.appScope.launch { container.auth.signOut() } },
                 onRetry = vm::retry,
             )
@@ -142,6 +148,18 @@ private fun SignedIn(container: MavrosContainer, userId: String) {
                 onSelectSeason = vm::selectSeason,
                 onRetry = vm::retry,
                 extra = { AddToList(container, PlaylistTarget.SeriesTarget(seriesId)) },
+            )
+        }
+        composable<SearchRoute> {
+            val vm: SearchViewModel = viewModel(key = "search-$userId", factory = viewModelFactory { initializer { SearchViewModel(container.catalog, container.requests) } })
+            val state by vm.state.collectAsStateWithLifecycle()
+            TvSearchScreen(
+                state,
+                onQuery = vm::onQuery,
+                onOpenMovie = { nav.navigate(DetailRoute(it)) },
+                onOpenSeries = { nav.navigate(SeriesRoute(it)) },
+                onRequest = vm::request,
+                onRetry = vm::retry,
             )
         }
         composable<ListsRoute> {

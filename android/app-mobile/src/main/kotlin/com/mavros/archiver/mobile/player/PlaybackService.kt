@@ -33,7 +33,8 @@ object PlaybackExtras {
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
-    private val container by lazy { (application as MavrosApplication).container }
+    private val app by lazy { application as MavrosApplication }
+    private val container by lazy { app.container }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val playback by lazy { PlaybackSession(scope, container.appScope, container.playback, container.progress) }
 
@@ -42,7 +43,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        player = playback.buildPlayer(this)
+        player = playback.buildPlayer(this, app.downloads.cache to app.downloads.cacheKeyFactory)
 
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, PlayerActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -94,6 +95,8 @@ class PlaybackService : MediaSessionService() {
                 item.buildUpon()
                     .setUri(item.requestMetadata.mediaUri)
                     .setMimeType(MimeTypes.APPLICATION_M3U8)
+                    // Descargada: solo la calidad e idiomas que hay en el teléfono (DL-04)
+                    .setStreamKeys(app.downloads.streamKeys(item.mediaId).orEmpty())
                     .build()
             }.toMutableList()
         }

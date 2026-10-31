@@ -1,10 +1,12 @@
 import Foundation
 import Supabase
+import MavrosModel
 
 /// URL firmada del master.m3u8 en el Worker y cuándo caduca su token (PLY-08)
 public struct PlaybackSource: Equatable, Sendable {
     public let url: URL
     public let expiresAt: Date
+    public init(url: URL, expiresAt: Date) { self.url = url; self.expiresAt = expiresAt }
 }
 
 /// Pide la URL a `/api/playback/<id>` con el token de Supabase (IPAD-06, PLY-06). El secreto del video nunca llega al iPad.
@@ -71,6 +73,18 @@ public final class ProgressRepository: Sendable {
         } catch {
             throw DataError.from(error)
         }
+    }
+}
+
+public extension ProgressRepository {
+    private struct UpdatedAt: Decodable { let movie_id: String; let updated_at: String }
+
+    /// updated_at (ms) del progreso guardado de cada película; nil si no se pudo preguntar (DL-05)
+    func updatedAt(movieIds: [String]) async -> [String: Int64]? {
+        guard let rows: [UpdatedAt] = try? await client.from("watch_progress").select("movie_id, updated_at").in("movie_id", values: movieIds).execute().value else { return nil }
+        var out: [String: Int64] = [:]
+        for r in rows { out[r.movie_id] = Int64(SeriesRules.instant(r.updated_at).timeIntervalSince1970 * 1000) }
+        return out
     }
 }
 

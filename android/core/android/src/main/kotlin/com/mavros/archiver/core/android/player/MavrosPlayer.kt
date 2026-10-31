@@ -7,7 +7,11 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheKeyFactory
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -48,13 +52,25 @@ class PlaybackSession(
     private var tickJob: Job? = null
     private var player: Player? = null
 
-    /** ExoPlayer con HLS, token siempre al día y reintento ante 403 */
-    fun buildPlayer(context: Context): ExoPlayer {
+    /**
+     * ExoPlayer con HLS, token siempre al día y reintento ante 403.
+     * Con [downloads] (teléfono), lo descargado se lee de esa caché antes que de la red (DL-04).
+     */
+    fun buildPlayer(context: Context, downloads: Pair<Cache, CacheKeyFactory>? = null): ExoPlayer {
         val upstream = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(false)
-        val dataSource = ResolvingDataSource.Factory(upstream) { spec ->
+        val resolving = ResolvingDataSource.Factory(upstream) { spec ->
             val latest = latestUrl ?: return@Factory spec
             spec.withUri(Uri.parse(PlaybackRules.swapToken(spec.uri.toString(), latest)))
         }
+        val dataSource: DataSource.Factory = downloads?.let { (cache, keys) ->
+            CacheDataSource.Factory()
+                .setCache(cache)
+                .setCacheKeyFactory(keys)
+                .setUpstreamDataSourceFactory(resolving)
+                // Ver en línea no llena la caché: solo lo descargado vive ahí
+                .setCacheWriteDataSinkFactory(null)
+                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        } ?: resolving
         val mediaSources = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSource)
             .setLoadErrorHandlingPolicy(TokenAwareErrorPolicy { refreshNow() })

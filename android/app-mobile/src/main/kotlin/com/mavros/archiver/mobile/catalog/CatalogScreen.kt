@@ -23,6 +23,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.DownloadDone
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -61,6 +64,10 @@ fun CatalogScreen(
     onOpenProfile: () -> Unit,
     onOpenSeries: (String) -> Unit = {},
     onOpenLists: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    /** null = este aparato no descarga; si no, cuántas descargas hay (DL-03) */
+    downloadsCount: Int? = null,
+    onOpenDownloads: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Al regresar a esta pantalla, "Seguir viendo" se actualiza
@@ -68,7 +75,7 @@ fun CatalogScreen(
         viewModel.refresh()
         onPauseOrDispose { }
     }
-    CatalogContent(state, onOpenMovie, onOpenProfile, viewModel::selectGenre, viewModel::retry, onOpenSeries, onOpenLists)
+    CatalogContent(state, onOpenMovie, onOpenProfile, viewModel::selectGenre, viewModel::retry, onOpenSeries, onOpenLists, onOpenSearch, downloadsCount, onOpenDownloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,6 +88,9 @@ fun CatalogContent(
     onRetry: () -> Unit,
     onOpenSeries: (String) -> Unit = {},
     onOpenLists: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    downloadsCount: Int? = null,
+    onOpenDownloads: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -95,6 +105,8 @@ fun CatalogContent(
                         fontWeight = FontWeight.Bold,
                     )
                 },
+                // Lupa a la izquierda: a la derecha ya no cabe sin cortar el nombre (SRCH-04)
+                navigationIcon = { IconButton(onClick = onOpenSearch, modifier = Modifier.testTag("open-search")) { Icon(Icons.Outlined.Search, contentDescription = "Buscar") } },
                 actions = {
                     IconButton(onClick = onOpenLists, modifier = Modifier.testTag("open-lists")) { Icon(Icons.AutoMirrored.Outlined.PlaylistPlay, contentDescription = "Mis listas") }
                     IconButton(onClick = onOpenProfile) { Icon(Icons.Outlined.AccountCircle, contentDescription = "Perfil") }
@@ -106,8 +118,9 @@ fun CatalogContent(
         when (state) {
             // Mismo padding que CatalogGrid: lo aplica la cuadrícula, no el contenedor
             CatalogUiState.Loading -> CatalogSkeleton(padding)
-            is CatalogUiState.Error -> ErrorState(state.error, onRetry, Modifier.padding(padding))
-            is CatalogUiState.Content -> CatalogGrid(state.catalog, state.genre, padding, onOpenMovie, onSelectGenre, onOpenSeries)
+            // Sin internet: lo descargado sigue a la mano (DL-03)
+            is CatalogUiState.Error -> ErrorState(state.error, onRetry, Modifier.padding(padding), onOpenDownloads.takeIf { downloadsCount != null })
+            is CatalogUiState.Content -> CatalogGrid(state.catalog, state.genre, padding, onOpenMovie, onSelectGenre, onOpenSeries, downloadsCount ?: 0, onOpenDownloads)
         }
     }
 }
@@ -120,6 +133,8 @@ private fun CatalogGrid(
     onOpenMovie: (String) -> Unit,
     onSelectGenre: (String?) -> Unit,
     onOpenSeries: (String) -> Unit,
+    downloadsCount: Int = 0,
+    onOpenDownloads: () -> Unit = {},
 ) {
     val full: LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
     LazyVerticalGrid(
@@ -129,6 +144,16 @@ private fun CatalogGrid(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag("catalog"),
     ) {
+        if (downloadsCount > 0) {
+            item(span = full) {
+                AssistChip(
+                    onClick = onOpenDownloads,
+                    label = { Text(if (downloadsCount == 1) "1 descarga" else "$downloadsCount descargas") },
+                    leadingIcon = { Icon(Icons.Outlined.DownloadDone, contentDescription = null, tint = MavrosColors.Accent) },
+                    modifier = Modifier.testTag("open-downloads"),
+                )
+            }
+        }
         if (catalog.continueWatching.isNotEmpty()) {
             item(span = full) { SectionTitle("Seguir viendo") }
             item(span = full) {

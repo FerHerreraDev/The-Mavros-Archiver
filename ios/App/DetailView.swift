@@ -71,6 +71,7 @@ struct DetailView: View {
                                 .buttonStyle(.bordered).accessibilityIdentifier("open-series")
                         }
                         AddToListButton(target: .movie(movie.id))
+                        DownloadButton(movie: OfflineMovie(movie: movie, series: detail.series))
                     }
                     if let synopsis = movie.synopsis { Text(synopsis).padding(.top, 4) }
                 }

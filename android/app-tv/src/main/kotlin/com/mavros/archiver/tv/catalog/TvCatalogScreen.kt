@@ -99,6 +99,7 @@ fun TvCatalogScreen(
     onRetry: () -> Unit,
     onOpenSeries: (String) -> Unit = {},
     onOpenLists: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
 ) {
     val signOut = remember { FocusRequester() }
     Column(Modifier.fillMaxSize().background(MavrosColors.Background)) {
@@ -112,6 +113,8 @@ fun TvCatalogScreen(
                 color = MavrosColors.Foreground,
                 modifier = Modifier.weight(1f),
             )
+            OutlinedButton(onClick = onOpenSearch, modifier = Modifier.testTag("tv-open-search")) { Text("Buscar") }
+            Spacer(Modifier.width(16.dp))
             OutlinedButton(onClick = onOpenLists, modifier = Modifier.testTag("tv-open-lists")) { Text("Mis listas") }
             Spacer(Modifier.width(16.dp))
             OutlinedButton(onClick = onSignOut, modifier = Modifier.focusRequester(signOut).testTag("tv-sign-out")) { Text("Cerrar sesión") }

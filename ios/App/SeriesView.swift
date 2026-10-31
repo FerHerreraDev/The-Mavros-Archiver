@@ -62,8 +62,12 @@ struct SeriesView: View {
                     }
                     if shown.isEmpty { Text("Esta serie todavía no tiene episodios.").foregroundStyle(Theme.muted) }
                     ForEach(shown) { episode in
-                        EpisodeRow(episode: episode, position: detail.progress[episode.id], isNext: detail.next?.episode.id == episode.id) {
-                            playing = PlayRequest(movie: episode, startAt: ProgressRules.resumePosition(detail.progress[episode.id], duration: episode.durationSeconds))
+                        HStack(alignment: .center, spacing: 12) {
+                            EpisodeRow(episode: episode, position: detail.progress[episode.id], isNext: detail.next?.episode.id == episode.id) {
+                                playing = PlayRequest(movie: episode, startAt: ProgressRules.resumePosition(detail.progress[episode.id], duration: episode.durationSeconds))
+                            }
+                            // Descargar cada episodio (IPAD-13)
+                            DownloadButton(movie: OfflineMovie(movie: episode, series: series), compact: true)
                         }
                     }
                 }

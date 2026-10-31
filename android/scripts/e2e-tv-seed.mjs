@@ -28,16 +28,18 @@ if (cmd === 'env') {
   }
   for (const [k, v] of Object.entries(env)) console.log(`export ${k}=${JSON.stringify(v)}`)
 } else if (cmd === 'seed') {
-  const { data: u, error } = await admin.auth.admin.createUser({
-    email: `tv-e2e-${tag}@example.com`, password: `pw-${tag}-x`, email_confirm: true, user_metadata: { password_set: true },
-  })
+  const email = `tv-e2e-${tag}@example.com`
+  const password = `pw-${tag}-x`
+  const { data: u, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { password_set: true } })
   if (error) throw error
+  // E2E_HLS: otro HLS de tests/fixtures/hls (las descargas usan `tracks`, con dos audios y subtítulos)
+  const hls = process.env.E2E_HLS ?? 'sample/master.m3u8'
   const { data: m, error: e2 } = await admin.from('movies').insert({
-    slug: `tv-e2e-${tag}`, title: 'TV Prueba Real', synopsis: 'Video HLS real de 12 s.', duration_seconds: 12,
-    hls_path: 'sample/master.m3u8', status: 'published', release_year: 2026, genres: ['prueba'], published_at: new Date().toISOString(),
+    slug: `tv-e2e-${tag}`, title: process.env.E2E_HLS ? 'Descargas Prueba' : 'TV Prueba Real', synopsis: 'Video HLS real de 12 s.', duration_seconds: 12,
+    hls_path: hls, status: 'published', release_year: 2026, genres: ['prueba'], published_at: new Date().toISOString(),
   }).select('id').single()
   if (e2) throw e2
-  writeFileSync(file, JSON.stringify({ userId: u.user.id, movieId: m.id }))
+  writeFileSync(file, JSON.stringify({ userId: u.user.id, movieId: m.id, email, password }))
 } else {
   const seed = JSON.parse(readFileSync(file, 'utf8'))
   if (cmd === 'approve') {

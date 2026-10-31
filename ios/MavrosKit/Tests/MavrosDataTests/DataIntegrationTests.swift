@@ -201,4 +201,16 @@ struct PlaybackTests {
         await LocalSupabase.deleteUser(user.id)
         }
     }
+
+    @Test("IPAD-12 / REQ-02 pedir desde el iPad: se crea, el mismo título pendiente es duplicado")
+    func requests() async throws {
+        try await cleaningUp { cleanup in
+            let user = try await LocalSupabase.createUser("ipad-req")
+            cleanup.add { await LocalSupabase.deleteUser(user.id) }
+            let (auth, _, _, _) = try await LocalSupabase.app(user)
+            let requests = RequestRepository(client: auth.client, auth: auth)
+            #expect(try await requests.request(title: "  Blade   Runner ") == .sent)
+            #expect(try await requests.request(title: "blade runner") == .duplicate)
+        }
+    }
 }

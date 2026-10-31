@@ -64,7 +64,14 @@ final class PlayerModel {
         nextCancelled = false
         upNext = nil
         do {
-            guard let source = try await model.playback.source(movieId: current.movie.id) else { phase = .unavailable; return }
+            // Descargada: se reproduce del iPad sin pedir nada a la red (IPAD-13, DL-04)
+            let source: PlaybackSource?
+            if let local = model.downloads.localURL(current.movie.id) {
+                source = PlaybackSource(url: local, expiresAt: .distantFuture)
+            } else {
+                source = try await model.playback.source(movieId: current.movie.id)
+            }
+            guard let source else { phase = .unavailable; return }
             load(source, at: current.startAt)
             phase = .playing
             player.play()
@@ -126,7 +133,7 @@ final class PlayerModel {
     /// URL nueva con token vigente; el video sigue desde donde iba
     private var recovering = false
     func recover() async {
-        guard !recovering else { return }
+        guard !recovering, model.downloads.localURL(current.movie.id) == nil else { return }
         recovering = true
         defer { recovering = false }
         let at = position
@@ -152,9 +159,9 @@ final class PlayerModel {
     private func save(_ position: Double?) {
         guard let position else { return }
         let id = current.movie.id
-        let repo = model.progress
-        // Termina aunque se cierre la pantalla
-        Task.detached { try? await repo.save(movieId: id, position: position) }
+        let downloads = model.downloads
+        // Termina aunque se cierre la pantalla; sin internet queda en el iPad para mandarlo después (DL-05)
+        Task { await downloads.save(progress: position, movieId: id) }
     }
 
     // MARK: - Siguiente (IPAD-09)

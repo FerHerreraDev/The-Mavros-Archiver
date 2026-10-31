@@ -26,6 +26,9 @@ import com.mavros.archiver.mobile.login.LoginScreen
 import com.mavros.archiver.mobile.login.LoginViewModel
 import com.mavros.archiver.mobile.profile.ProfileScreen
 import com.mavros.archiver.mobile.series.SeriesScreen
+import com.mavros.archiver.mobile.update.UpdateGate
+import com.mavros.archiver.mobile.search.SearchScreen
+import com.mavros.archiver.core.android.search.SearchViewModel
 import com.mavros.archiver.core.android.series.SeriesViewModel
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -37,6 +40,15 @@ import com.mavros.archiver.mobile.lists.AddToListButton
 import com.mavros.archiver.mobile.lists.ListsContent
 import com.mavros.archiver.mobile.lists.PlaylistContent
 import kotlinx.serialization.Serializable
+import androidx.compose.runtime.remember
+import com.mavros.archiver.core.android.download.OfflineDownloads
+import com.mavros.archiver.core.android.download.OfflineMovie
+import com.mavros.archiver.core.model.Movie
+import com.mavros.archiver.core.model.ProgressRules
+import com.mavros.archiver.core.model.Series
+import com.mavros.archiver.mobile.download.DownloadButton
+import com.mavros.archiver.mobile.download.DownloadsScreen
+import com.mavros.archiver.mobile.download.EpisodeDownloadIcon
 
 @Serializable data object CatalogRoute
 @Serializable data class DetailRoute(val movieId: String)
@@ -44,13 +56,15 @@ import kotlinx.serialization.Serializable
 @Serializable data class SeriesRoute(val seriesId: String)
 @Serializable data object ListsRoute
 @Serializable data class PlaylistRoute(val playlistId: String)
+@Serializable data object SearchRoute
+@Serializable data object DownloadsRoute
 
 /**
  * Sin sesión solo existe el login; con sesión, catálogo/detalle/perfil.
  * Si la sesión se pierde (logout, revocada, MOB-06) la app vuelve sola al login.
  */
 @Composable
-fun MavrosNavHost(container: AppContainer) {
+fun MavrosNavHost(container: AppContainer, downloads: OfflineDownloads? = null) {
     val session by container.auth.session.collectAsStateWithLifecycle()
 
     when (val state = session) {
@@ -59,13 +73,15 @@ fun MavrosNavHost(container: AppContainer) {
             val vm: LoginViewModel = viewModel(factory = viewModelFactory { initializer { LoginViewModel(container.auth) } })
             LoginScreen(vm)
         }
-        is SessionState.SignedIn -> SignedInGraph(container, state)
+        // Con sesión, primero se confirma que la app esté al día (UPD-04)
+        is SessionState.SignedIn -> UpdateGate(container) { SignedInGraph(container, state, downloads) }
     }
 }
 
 @Composable
-private fun SignedInGraph(container: AppContainer, session: SessionState.SignedIn) {
+private fun SignedInGraph(container: AppContainer, session: SessionState.SignedIn, downloads: OfflineDownloads?) {
     val nav = rememberNavController()
+    val offline by (downloads?.items ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }).collectAsStateWithLifecycle()
     NavHost(nav, startDestination = CatalogRoute) {
         composable<CatalogRoute> {
             val vm: CatalogViewModel = viewModel(factory = viewModelFactory { initializer { CatalogViewModel(container.catalog, container.progress) } })
@@ -75,7 +91,27 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 onOpenProfile = { nav.navigate(ProfileRoute) },
                 onOpenSeries = { nav.navigate(SeriesRoute(it)) },
                 onOpenLists = { nav.navigate(ListsRoute) },
+                onOpenSearch = { nav.navigate(SearchRoute) },
+                downloadsCount = if (downloads == null) null else offline.size,
+                onOpenDownloads = { nav.navigate(DownloadsRoute) },
             )
+        }
+        composable<DownloadsRoute> {
+            val context = LocalContext.current
+            DownloadsScreen(
+                items = offline.values.sortedBy { it.movie.title.lowercase() },
+                onBack = { nav.popBackStack() },
+                onPlay = { movie ->
+                    // Desde donde se quedó, aunque no haya internet (DL-04)
+                    val start = ProgressRules.resumePosition(container.offlineProgress?.position(movie.id), movie.durationSeconds)
+                    context.startActivity(PlayerActivity.intent(context, Movie(id = movie.id, slug = "", title = movie.title, durationSeconds = movie.durationSeconds), start))
+                },
+                onRemove = { downloads?.remove(it) },
+            )
+        }
+        composable<SearchRoute> {
+            val vm: SearchViewModel = viewModel(factory = viewModelFactory { initializer { SearchViewModel(container.catalog, container.requests) } })
+            SearchScreen(vm, onBack = { nav.popBackStack() }, onOpenMovie = { nav.navigate(DetailRoute(it)) }, onOpenSeries = { nav.navigate(SeriesRoute(it)) })
         }
         composable<ListsRoute> {
             val vm: ListsViewModel = viewModel(factory = viewModelFactory { initializer { ListsViewModel(container.playlists) } })
@@ -108,6 +144,11 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 onBack = { nav.popBackStack() },
                 onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
                 extra = { AddToList(container, PlaylistTarget.SeriesTarget(seriesId)) },
+                episodeExtra = { episode ->
+                    downloads?.let { d ->
+                        EpisodeDownloadIcon(offline[episode.id], "${episode.episodeTag} ${episode.title}", onStart = { d.start(offlineMovie(episode)) }, onRemove = { d.remove(episode.id) })
+                    }
+                },
             )
         }
         composable<DetailRoute> { entry ->
@@ -118,7 +159,13 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
                 viewModel = vm,
                 onBack = { nav.popBackStack() },
                 onPlay = { movie, start -> context.startActivity(PlayerActivity.intent(context, movie, start)) },
-                extra = { AddToList(container, PlaylistTarget.MovieTarget(movieId)) },
+                extra = {
+                    AddToList(container, PlaylistTarget.MovieTarget(movieId))
+                    if (downloads != null) {
+                        val detail = (vm.state.collectAsStateWithLifecycle().value as? com.mavros.archiver.core.android.detail.DetailUiState.Content)?.detail
+                        detail?.let { DownloadButton(offline[movieId], onStart = { downloads.start(offlineMovie(it.movie, it.series)) }, onRemove = { downloads.remove(movieId) }) }
+                    }
+                },
                 onOpenSeries = { nav.navigate(SeriesRoute(it)) },
             )
         }
@@ -131,6 +178,15 @@ private fun SignedInGraph(container: AppContainer, session: SessionState.SignedI
         }
     }
 }
+
+/** Lo que se guarda para mostrar la descarga sin internet (DL-03) */
+private fun offlineMovie(movie: Movie, series: Series? = null) = OfflineMovie(
+    id = movie.id,
+    title = movie.title,
+    durationSeconds = movie.durationSeconds,
+    posterSrc = movie.posterSrc ?: series?.posterSrc,
+    subtitle = movie.episodeTag?.let { tag -> listOfNotNull(series?.title, tag).joinToString(" · ") },
+)
 
 /** "Agregar a lista" con su ViewModel (uno por película/serie) */
 @Composable

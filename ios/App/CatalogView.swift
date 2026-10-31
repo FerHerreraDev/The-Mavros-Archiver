@@ -15,6 +15,8 @@ struct CatalogView: View {
     @Binding var path: NavigationPath
     @State private var state: Loadable<Catalog> = .loading
     @State private var genre: String?
+    @State private var query = ""
+    @State private var request: Loadable<RequestResult>?
 
     private let grid = [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 16, alignment: .top)]
 
@@ -24,7 +26,8 @@ struct CatalogView: View {
                 switch state {
                 case .loading: skeleton
                 case .failed(let error): ErrorState(error: error) { Task { await load(showLoading: true) } }.padding(.top, 80)
-                case .loaded(let catalog): content(catalog)
+                case .loaded(let catalog):
+                    if SearchRules.normalize(query).isEmpty { content(catalog) } else { results(catalog) }
                 }
             }
             .padding(.horizontal, 24)
@@ -33,6 +36,15 @@ struct CatalogView: View {
         .background(Theme.background)
         .navigationTitle("The Mavros Archiver")
         .navigationBarTitleDisplayMode(.inline)
+        // Búsqueda (IPAD-12, SRCH-01): sobre todo el catálogo, sin el filtro de género
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Buscar películas y series")
+        .onChange(of: query) {
+            request = nil
+            if !query.isEmpty, genre != nil {
+                genre = nil
+                Task { await load(showLoading: false) }
+            }
+        }
         .refreshable { await load(showLoading: false) }
         .task { await load(showLoading: true) }
         // Al volver del reproductor "Seguir viendo" muestra el progreso nuevo (MOB-19)
@@ -102,6 +114,64 @@ struct CatalogView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    /// Resultados de la búsqueda; sin resultados, "Pedir «…»" (SRCH-03, REQ-03)
+    @ViewBuilder
+    private func results(_ catalog: Catalog) -> some View {
+        let hits = SearchRules.searchCatalog(catalog, query: query)
+        let title = query.trimmingCharacters(in: .whitespaces)
+        if hits.isEmpty {
+            VStack(spacing: 16) {
+                ContentUnavailableView("No encontramos «\(title)».", systemImage: "magnifyingglass")
+                switch request {
+                case .loaded(.sent):
+                    Text(RequestResult.sent.message).accessibilityIdentifier("request-message")
+                default:
+                    Button {
+                        request = .loading
+                        Task {
+                            do { request = .loaded(try await model.requests.request(title: title)) } catch { request = .failed(DataError.from(error)) }
+                        }
+                    } label: {
+                        if case .loading = request { ProgressView() } else { Text("Pedir «\(title)»") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .disabled({ if case .loading = request { return true } else { return false } }())
+                    .accessibilityIdentifier("request")
+                    if case .loaded(let result) = request {
+                        Text(result.message).foregroundStyle(Theme.accent).accessibilityIdentifier("request-message")
+                    } else if case .failed = request {
+                        Text("No se pudo enviar el pedido.").foregroundStyle(Theme.accent).accessibilityIdentifier("request-message")
+                    }
+                }
+            }
+            .padding(.top, 40)
+            .frame(maxWidth: .infinity)
+        } else {
+            Section(title: "Resultados para «\(title)»") {
+                LazyVGrid(columns: grid, spacing: 20) {
+                    ForEach(hits) { hit in
+                        switch hit {
+                        case .movie(let movie):
+                            Button { path.append(Route.movie(movie.id)) } label: {
+                                Card(poster: movie.posterSrc, title: movie.title, meta: [movie.releaseYear.map(String.init), formatDuration(movie.durationSeconds)].compactMap { $0 }.joined(separator: " · "))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("movie-\(movie.id)")
+                        case .series(let show):
+                            Button { path.append(Route.series(show.series.id)) } label: {
+                                Card(poster: show.series.posterSrc, title: show.series.title, meta: [show.series.releaseYear.map(String.init), show.countLabel].compactMap { $0 }.joined(separator: " · "))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("series-\(show.series.id)")
+                        }
+                    }
+                }
+            }
+            .padding(.top, 8)
+        }
     }
 
     /// Episodio: póster y título de su serie, "T1:E5 · título", y abre la serie (SER-11, SER-20)

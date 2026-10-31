@@ -38,6 +38,8 @@ class PlayerViewModel(
     private val catalog: CatalogRepository? = null,
     private val playlists: PlaylistRepository? = null,
     private val listId: String? = null,
+    /** Película descargada: se reproduce de ahí sin pedir nada a la red (DL-04) */
+    private val local: (suspend (String) -> PlaybackSource?)? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading)
     val state: StateFlow<PlayerUiState> = _state
@@ -62,6 +64,10 @@ class PlayerViewModel(
         job?.cancel()
         _state.value = PlayerUiState.Loading
         job = viewModelScope.launch {
+            local?.invoke(movieId)?.let {
+                _state.value = PlayerUiState.Ready(it)
+                return@launch
+            }
             val result = repository.source(movieId)
             if (!isActive) return@launch
             _state.value = when (result) {

@@ -64,9 +64,15 @@ import com.mavros.archiver.mobile.ui.DetailSkeleton
 import com.mavros.archiver.mobile.ui.ErrorState
 
 @Composable
-fun SeriesScreen(viewModel: SeriesViewModel, onBack: () -> Unit, onPlay: (movie: Movie, startAt: Double) -> Unit, extra: @Composable () -> Unit = {}) {
+fun SeriesScreen(
+    viewModel: SeriesViewModel,
+    onBack: () -> Unit,
+    onPlay: (movie: Movie, startAt: Double) -> Unit,
+    extra: @Composable () -> Unit = {},
+    episodeExtra: @Composable (Movie) -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    SeriesContent(state, onBack, onPlay, viewModel::selectSeason, viewModel::retry, extra)
+    SeriesContent(state, onBack, onPlay, viewModel::selectSeason, viewModel::retry, extra, episodeExtra)
 }
 
 /** Página de la serie (SER-09, SER-10, SER-15) */
@@ -79,6 +85,8 @@ fun SeriesContent(
     onSelectSeason: (Int) -> Unit,
     onRetry: () -> Unit,
     extra: @Composable () -> Unit = {},
+    /** Al lado de cada episodio (su botón de descarga, DL-01) */
+    episodeExtra: @Composable (Movie) -> Unit = {},
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -96,13 +104,21 @@ fun SeriesContent(
             SeriesUiState.NotAvailable -> Box(Modifier.fillMaxSize().padding(padding).testTag("not-available"), contentAlignment = Alignment.Center) {
                 Text("Esta serie no está disponible.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is SeriesUiState.Content -> SeriesBody(state.detail, state.season, Modifier.padding(padding), onPlay, onSelectSeason, extra)
+            is SeriesUiState.Content -> SeriesBody(state.detail, state.season, Modifier.padding(padding), onPlay, onSelectSeason, extra, episodeExtra)
         }
     }
 }
 
 @Composable
-private fun SeriesBody(detail: SeriesDetail, season: Int?, modifier: Modifier, onPlay: (Movie, Double) -> Unit, onSelectSeason: (Int) -> Unit, extra: @Composable () -> Unit) {
+private fun SeriesBody(
+    detail: SeriesDetail,
+    season: Int?,
+    modifier: Modifier,
+    onPlay: (Movie, Double) -> Unit,
+    onSelectSeason: (Int) -> Unit,
+    extra: @Composable () -> Unit,
+    episodeExtra: @Composable (Movie) -> Unit,
+) {
     val series = detail.series
     val shown = detail.episodes.filter { it.seasonNumber == season }
     LazyColumn(
@@ -179,7 +195,7 @@ private fun SeriesBody(detail: SeriesDetail, season: Int?, modifier: Modifier, o
         }
         items(shown, key = { it.id }) { episode ->
             val position = detail.progress[episode.id]
-            EpisodeRow(episode, position, isNext = detail.next?.episode?.id == episode.id) {
+            EpisodeRow(episode, position, isNext = detail.next?.episode?.id == episode.id, extra = { episodeExtra(episode) }) {
                 onPlay(episode, ProgressRules.resumePosition(position, episode.durationSeconds))
             }
         }
@@ -188,7 +204,7 @@ private fun SeriesBody(detail: SeriesDetail, season: Int?, modifier: Modifier, o
 
 /** Episodio con imagen 16:9, progreso, título, duración y sinopsis; el que sigue, resaltado (SER-18) */
 @Composable
-private fun EpisodeRow(episode: Movie, position: Double?, isNext: Boolean, onClick: () -> Unit) {
+private fun EpisodeRow(episode: Movie, position: Double?, isNext: Boolean, extra: @Composable () -> Unit = {}, onClick: () -> Unit) {
     val inProgress = position != null && ProgressRules.isInProgress(position, episode.durationSeconds)
     val shape = RoundedCornerShape(12.dp)
     Column(
@@ -216,6 +232,7 @@ private fun EpisodeRow(episode: Movie, position: Double?, isNext: Boolean, onCli
                 Text("${episode.episodeNumber}. ${episode.title}", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(formatDurationShort(episode.durationSeconds), style = MonoLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            extra()
         }
         episode.synopsis?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("synopsis-${episode.id}"))

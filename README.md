@@ -71,6 +71,18 @@ pnpm hls:verify "$(pnpm -s video:url movies/<slug>/master.m3u8)"     # VID-07 th
 
 Then create the movie in **Admin → Películas** with path `movies/<slug>/master.m3u8`.
 
+## Android updates
+
+The phone and TV apps are installed outside Google Play. Bump `versionCode`/`versionName` in `android/app-mobile/build.gradle.kts` and `android/app-tv/build.gradle.kts`, then:
+
+```bash
+pnpm android:release            # builds both prodRelease APKs, checks secrets, uploads to the private `apps` bucket
+pnpm android:release --only tv  # just one app
+pnpm android:release --dry-run  # build and check without uploading
+```
+
+Every device asks `/api/app/latest` when the app opens and asks the user to install the new version before going on (UPD-01..UPD-07). Run migration `0012` first.
+
 ## Deploying
 
 - **Worker:** `pnpm video:deploy` (`workers/video/wrangler.toml`); set its secret with `wrangler secret put VIDEO_TOKEN_SECRET`.

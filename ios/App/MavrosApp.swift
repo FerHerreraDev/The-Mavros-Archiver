@@ -25,6 +25,9 @@ final class AppModel {
     let playback: PlaybackRepository
     let progress: ProgressRepository
     let playlists: PlaylistRepository
+    let requests: RequestRepository
+    /// Descargas para ver sin internet (IPAD-13)
+    let downloads = DownloadsModel()
     private(set) var session: SessionState = .loading
 
     init() {
@@ -44,6 +47,8 @@ final class AppModel {
         playback = PlaybackRepository(config: config, auth: auth)
         progress = ProgressRepository(client: client)
         playlists = PlaylistRepository(client: client, auth: auth)
+        requests = RequestRepository(client: client, auth: auth)
+        downloads.attach(self)
         Task { await listen() }
     }
 
@@ -54,7 +59,18 @@ final class AppModel {
             // Al abrir: confirmar con el servidor que la sesión sigue valiendo (MOB-06)
             if case .signedIn = state, !validated {
                 validated = true
-                Task { await auth.validateSession() }
+                Task {
+                    // Con conexión: se manda lo visto sin internet y se borra lo despublicado (DL-05, DL-06)
+                    if await auth.validateSession() {
+                        await downloads.flush()
+                        await downloads.prune()
+                    }
+                }
+            }
+            // DL-06: sin sesión no queda nada descargado
+            if case .signedOut = state {
+                validated = false
+                downloads.removeAll()
             }
         }
     }
@@ -83,6 +99,7 @@ enum Route: Hashable {
     case series(String)
     case lists
     case list(String)
+    case downloads
 }
 
 struct MainView: View {
@@ -99,9 +116,14 @@ struct MainView: View {
                     case .series(let id): SeriesView(seriesId: id)
                     case .lists: ListsView(path: $path)
                     case .list(let id): PlaylistView(playlistId: id, path: $path)
+                    case .downloads: DownloadsView()
                     }
                 }
                 .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { path.append(Route.downloads) } label: { Label("Descargas", systemImage: "arrow.down.circle") }
+                            .accessibilityIdentifier("downloads")
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { path.append(Route.lists) } label: { Label("Mis listas", systemImage: "list.bullet.rectangle") }
                             .accessibilityIdentifier("my-lists")

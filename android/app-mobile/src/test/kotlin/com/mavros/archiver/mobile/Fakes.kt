@@ -125,6 +125,10 @@ class FakeContainer(
         override suspend fun poll(deviceCode: String) = DataResult.Failure(com.mavros.archiver.core.data.DataError.Server)
     },
     override val playlists: FakePlaylistRepository = FakePlaylistRepository(),
+    override val updates: com.mavros.archiver.core.data.AppUpdateRepository = object : com.mavros.archiver.core.data.AppUpdateRepository {
+        override suspend fun latest(app: String) = DataResult.Success(null)
+    },
+    override val requests: FakeRequestRepository = FakeRequestRepository(),
 ) : AppContainer {
     override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 }
@@ -164,4 +168,10 @@ class FakePlaylistRepository : PlaylistRepository {
         return DataResult.Success(id)
     }
     override suspend fun next(playlistId: String, movieId: String): DataResult<ListPick?> { nextRequests += playlistId to movieId; return nextResult }
+}
+
+class FakeRequestRepository : com.mavros.archiver.core.data.RequestRepository {
+    val titles = mutableListOf<String>()
+    var result: DataResult<com.mavros.archiver.core.data.RequestResult> = DataResult.Success(com.mavros.archiver.core.data.RequestResult.Sent)
+    override suspend fun request(title: String): DataResult<com.mavros.archiver.core.data.RequestResult> { titles += title; return result }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- TV-08: solo internet -->
+    <!-- TV-08: internet; la instalación de sus propias versiones viene de core:android (UPD-05) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- App de tele: se maneja con control remoto, sin pantalla táctil -->

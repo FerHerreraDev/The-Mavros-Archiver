@@ -6,11 +6,11 @@ import type { Movie, Series } from '@/lib/movies'
 
 export type CatalogMovie = Pick<
   Movie,
-  'id' | 'slug' | 'title' | 'release_year' | 'duration_seconds' | 'genres' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash' | 'published_at'
+  'id' | 'slug' | 'title' | 'original_title' | 'release_year' | 'duration_seconds' | 'genres' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash' | 'published_at'
 >
 export type CatalogSeries = Pick<
   Series,
-  'id' | 'slug' | 'title' | 'release_year' | 'genres' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash' | 'published_at'
+  'id' | 'slug' | 'title' | 'original_title' | 'release_year' | 'genres' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash' | 'published_at'
 > & { seasons: number; episodes: number }
 /** Episodio con lo que necesitan las reglas de series (SER-10..SER-13) */
 export type CatalogEpisode = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status' | 'synopsis' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash'> & {
@@ -27,8 +27,8 @@ export type ContinueItem = {
   episode?: { series: CatalogSeries; season: number; episode: number }
 }
 
-const CARD_FIELDS = 'id, slug, title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
-const SERIES_FIELDS = 'id, slug, title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
+const CARD_FIELDS = 'id, slug, title, original_title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
+const SERIES_FIELDS = 'id, slug, title, original_title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
 const EPISODE_FIELDS = 'id, slug, title, duration_seconds, status, series_id, season_number, episode_number, synopsis, poster_url, poster_image_url, poster_thumbhash'
 
 type EpisodeRow = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status' | 'synopsis' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash'> & {

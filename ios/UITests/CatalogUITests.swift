@@ -87,4 +87,31 @@ final class CatalogUITests: XCTestCase {
         XCTAssertTrue(app.buttons["play"].label.contains("Reproducir"))
         XCTAssertFalse(app.buttons["open-series"].exists, "una película no tiene Ver episodios")
     }
+
+    func testIPAD12_SearchWithoutAccentsAndRequestWhenNothingMatches() {
+        let app = launch()
+        signIn(app)
+        XCTAssertTrue(app.staticTexts["Recién agregadas"].waitForExistence(timeout: 15))
+        dismissSavePassword(app)
+
+        let search = app.searchFields["Buscar películas y series"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("pelicula ipad")
+        XCTAssertTrue(app.buttons["Ver Película iPad"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Ver Serie iPad"].exists)
+
+        search.buttons["Clear text"].firstMatch.tap()
+        // Borrar quita el foco del campo
+        search.tap()
+        let wanted = "Nada \(UUID().uuidString.prefix(6))"
+        search.typeText(wanted)
+        let request = app.buttons["request"]
+        XCTAssertTrue(request.waitForExistence(timeout: 5))
+        XCTAssertEqual(request.label, "Pedir «\(wanted)»")
+        request.tap()
+        let message = app.staticTexts["request-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        XCTAssertEqual(message.label, "Listo, se lo pedimos al admin.")
+    }
 }
