@@ -24,12 +24,13 @@ export default async function DashboardLayout({
       {/* Navbar Superior estilo Netflix */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <Link href="/dashboard" className="text-base sm:text-xl font-bold tracking-tighter uppercase whitespace-nowrap">
-            The Mavros <span className="text-red-500">Archiver</span>
+          {/* En móvil el logo cede espacio (sin "The" y recortable) para que los íconos nunca se salgan (UI-01) */}
+          <Link href="/dashboard" className="min-w-0 truncate text-base sm:text-xl font-bold tracking-tighter uppercase whitespace-nowrap">
+            <span className="hidden sm:inline">The </span>Mavros <span className="text-red-500">Archiver</span>
           </Link>
-          
+
           {/* En móvil solo íconos; el texto queda como sr-only para lectores de pantalla */}
-          <nav className="flex items-center gap-3 sm:gap-6 text-sm font-medium">
+          <nav className="flex shrink-0 items-center gap-3 sm:gap-6 text-sm font-medium">
             <Link href="/dashboard" className="flex items-center gap-2 hover:text-red-500 transition-colors">
               <Film className="w-4 h-4" /> <span className="sr-only sm:not-sr-only">Catálogo</span>
             </Link>
