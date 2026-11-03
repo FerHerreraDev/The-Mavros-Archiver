@@ -83,8 +83,8 @@ test('PRG-01 al pausar se guarda la posición en la base', async ({ page }) => {
     v.pause()
     return v.currentTime
   })
-  await expect.poll(savedPosition, { timeout: 10_000 }).toBeGreaterThan(0)
-  expect(Math.abs(Number(await savedPosition()) - t)).toBeLessThan(1)
+  // Al arrancar ya se guardó una posición cercana a 0: se espera a la de la pausa, no a cualquiera
+  await expect.poll(async () => Math.abs(Number(await savedPosition()) - t), { timeout: 10_000 }).toBeLessThan(1)
 })
 
 test('PRG-02 al volver, arranca donde se quedó', async ({ page }) => {

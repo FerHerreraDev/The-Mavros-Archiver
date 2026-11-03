@@ -185,10 +185,34 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
     [movieId, supabase]
   )
 
+  // Al salir (PRG-06) la página puede morir antes de que el cliente de Supabase arranque su petición
+  // (espera la sesión de forma asíncrona). Con el token ya en memoria se manda un fetch keepalive,
+  // que el navegador termina de enviar aunque la pestaña ya se haya cerrado.
+  const accessToken = useRef<string | null>(null)
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => (accessToken.current = data.session?.access_token ?? null))
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => (accessToken.current = session?.access_token ?? null))
+    return () => data.subscription.unsubscribe()
+  }, [supabase])
+
   useEffect(() => {
     const flush = () => {
       const t = videoRef.current?.currentTime
-      if (t !== undefined && t !== lastSaved.current && t > 0) void save(t)
+      if (t === undefined || t === lastSaved.current || t <= 0) return
+      const token = accessToken.current
+      if (!token) return void save(t)
+      lastSaved.current = t
+      void fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/watch_progress?on_conflict=user_id,movie_id`, {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify({ movie_id: movieId, position_seconds: Math.round(t * 1000) / 1000 }),
+      }).catch(() => {})
     }
     const onVisibility = () => document.visibilityState === 'hidden' && flush()
     window.addEventListener('pagehide', flush)
@@ -198,7 +222,7 @@ export function MoviePlayer({ movieId, title, poster, initialUrl, initialExpires
       window.removeEventListener('pagehide', flush)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [save])
+  }, [save, movieId])
 
   return (
     <div className="relative">
