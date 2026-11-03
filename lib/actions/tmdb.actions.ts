@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/guards'
 import { createTmdb, fillEmpty, isGenericEpisodeTitle, TMDB_NOT_CONFIGURED, type TmdbResult } from '@/lib/tmdb/client.mjs'
-import { BACKDROP_MAX_WIDTH, processPoster, uploadPoster } from '@/lib/poster/thumbhash'
+import { BACKDROP_MAX_WIDTH, LOGO_MAX_WIDTH, accentColor, processPoster, uploadPoster } from '@/lib/poster/thumbhash'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Panel: llenar datos desde TMDB (TMDB-02, TMDB-03). Solo admins; la clave nunca sale del servidor.
@@ -31,12 +31,20 @@ export async function searchTmdbAction(input: { kind: string; query: string; yea
   }
 }
 
-/** Vista previa y copia optimizada de una imagen nueva (LOAD-03/07); si falla, queda la URL */
-async function imageFields(supabase: SupabaseClient, url: string | undefined, prefix: 'poster' | 'backdrop') {
+const MAX_WIDTH = { poster: undefined, backdrop: BACKDROP_MAX_WIDTH, logo: LOGO_MAX_WIDTH }
+
+/**
+ * Vista previa y copia optimizada de una imagen nueva (LOAD-03/07); si falla, queda la URL.
+ * La imagen horizontal trae además su color (TMDB-07); el logo no tiene vista previa.
+ */
+async function imageFields(supabase: SupabaseClient, url: string | undefined, prefix: 'poster' | 'backdrop' | 'logo') {
   if (!url) return {}
-  const processed = await processPoster(url, undefined, prefix === 'backdrop' ? BACKDROP_MAX_WIDTH : undefined)
+  const processed = await processPoster(url, undefined, MAX_WIDTH[prefix])
   const copy = processed.image ? await uploadPoster(supabase, processed.image) : null
-  return { [`${prefix}_thumbhash`]: processed.thumbhash, [`${prefix}_image_url`]: copy }
+  const out: Record<string, unknown> = { [`${prefix}_image_url`]: copy }
+  if (prefix !== 'logo') out[`${prefix}_thumbhash`] = processed.thumbhash
+  if (prefix === 'backdrop' && processed.image) out.accent_color = await accentColor(processed.image)
+  return out
 }
 
 /** Llena los campos vacíos de la película o serie con la de TMDB elegida y guarda su id (TMDB-02) */
@@ -61,13 +69,14 @@ export async function applyTmdbAction(input: { kind: string; id: string; tmdbId:
   }
   if (!details) return { error: 'TMDB ya no tiene ese resultado.' }
 
-  // El título nunca cambia; una película no tiene imagen horizontal
-  const { tmdb_id, backdrop_url, ...rest } = details
-  const updates: Record<string, unknown> = fillEmpty(current, kind === 'series' ? { ...rest, backdrop_url } : rest)
+  // El título nunca cambia
+  const { tmdb_id, ...rest } = details
+  const updates: Record<string, unknown> = fillEmpty(current, rest)
   Object.assign(
     updates,
     await imageFields(session.supabase, updates.poster_url as string | undefined, 'poster'),
     await imageFields(session.supabase, updates.backdrop_url as string | undefined, 'backdrop'),
+    await imageFields(session.supabase, updates.logo_url as string | undefined, 'logo'),
     { tmdb_id },
   )
 
@@ -77,7 +86,7 @@ export async function applyTmdbAction(input: { kind: string; id: string; tmdbId:
     return { error: 'No se pudieron guardar los datos de TMDB.' }
   }
   revalidatePath('/dashboard', 'layout')
-  const filled = Object.keys(updates).filter((k) => !k.endsWith('_thumbhash') && !k.endsWith('_image_url') && k !== 'tmdb_id').length
+  const filled = Object.keys(updates).filter((k) => !k.endsWith('_thumbhash') && !k.endsWith('_image_url') && !['tmdb_id', 'accent_color'].includes(k)).length
   return { success: filled ? `Listo: se llenaron ${filled} campo(s) desde TMDB.` : 'Vinculada con TMDB. No había campos vacíos que llenar.' }
 }
 

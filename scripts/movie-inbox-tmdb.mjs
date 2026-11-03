@@ -2,7 +2,7 @@
 // si un episodio no tiene imagen, un cuadro del propio video. Nada de esto puede hacer fallar
 // el procesado: ante cualquier error se registra y se sigue con lo que haya.
 import { execFile } from 'node:child_process'
-import { BACKDROP_MAX_WIDTH, POSTER_MAX_WIDTH, processImageBytes, uploadImage } from '../lib/poster/image.mjs'
+import { BACKDROP_MAX_WIDTH, LOGO_MAX_WIDTH, POSTER_MAX_WIDTH, accentColor, processImageBytes, uploadImage } from '../lib/poster/image.mjs'
 import { fillEmpty, isGenericEpisodeTitle } from '../lib/tmdb/client.mjs'
 
 const IMAGE_MAX_BYTES = 15 * 1024 * 1024
@@ -27,11 +27,27 @@ async function store(db, bytes, maxWidth) {
   return { image_url: image ? await uploadImage(db, image) : null, thumbhash }
 }
 
-/** Campos de imagen para una URL nueva de TMDB (póster o imagen horizontal) */
-async function imageFields(db, url, prefix, maxWidth) {
+/**
+ * Campos de imagen para una URL nueva de TMDB (póster, imagen horizontal o logo). La imagen
+ * horizontal trae además su color (TMDB-07); el logo no tiene vista previa.
+ */
+export async function imageFields(db, url, prefix, maxWidth) {
   if (!url) return {}
-  const { image_url, thumbhash } = await store(db, await downloadImage(url), maxWidth)
-  return { [`${prefix}_image_url`]: image_url, [`${prefix}_thumbhash`]: thumbhash }
+  const bytes = await downloadImage(url)
+  const { image_url, thumbhash } = await store(db, bytes, maxWidth)
+  const out = { [`${prefix}_image_url`]: image_url }
+  if (prefix !== 'logo') out[`${prefix}_thumbhash`] = thumbhash
+  if (prefix === 'backdrop' && bytes) out.accent_color = await accentColor(bytes)
+  return out
+}
+
+/** Copias optimizadas de las imágenes nuevas de [updates] (las que TMDB acaba de llenar) */
+export async function tmdbImageFields(db, updates) {
+  return {
+    ...(await imageFields(db, updates.poster_url, 'poster', POSTER_MAX_WIDTH)),
+    ...(await imageFields(db, updates.backdrop_url, 'backdrop', BACKDROP_MAX_WIDTH)),
+    ...(await imageFields(db, updates.logo_url, 'logo', LOGO_MAX_WIDTH)),
+  }
 }
 
 /** Un cuadro JPEG del video en el segundo [at] (~25 % de la duración, lejos de logos y créditos) */
@@ -57,11 +73,9 @@ export async function enrichMovie(db, tmdb, id, { title, year }) {
     const details = await tmdb.movie(hit.tmdbId)
     if (!details) return
     const { data: current } = await db.from('movies').select('*').eq('id', id).single()
-    // Una película no tiene imagen horizontal
     const { tmdb_id, ...rest } = details
-    delete rest.backdrop_url
     const updates = fillEmpty(current, rest)
-    Object.assign(updates, await imageFields(db, updates.poster_url, 'poster', POSTER_MAX_WIDTH), { tmdb_id })
+    Object.assign(updates, await tmdbImageFields(db, updates), { tmdb_id })
     await db.from('movies').update(updates).eq('id', id)
     log(`TMDB: "${title}" → ${hit.title} (${hit.year ?? 's/a'})`)
   } catch (err) {
@@ -85,8 +99,7 @@ export async function seriesFieldsFromTmdb(db, tmdb, { title, year }) {
       ...details,
       // El año del nombre del archivo manda; si no venía, el de TMDB
       release_year: year ?? details.release_year,
-      ...(await imageFields(db, details.poster_url, 'poster', POSTER_MAX_WIDTH)),
-      ...(await imageFields(db, details.backdrop_url, 'backdrop', BACKDROP_MAX_WIDTH)),
+      ...(await tmdbImageFields(db, details)),
     }
   } catch (err) {
     log(`TMDB: no se pudo completar la serie "${title}": ${err.message}`)

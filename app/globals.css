@@ -112,3 +112,26 @@ body {
     opacity: 0.8;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   Portada (CAT-07): la imagen de la destacada se aleja despacio (Ken Burns).
+   Solo transform y en CSS: corre en el compositor sin ocupar el hilo principal
+   (con JS por cuadro, en equipos lentos la navegación se trababa).
+   -------------------------------------------------------------------------- */
+@keyframes ken-burns {
+  from {
+    transform: scale(1.1);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.ken-burns {
+  animation: ken-burns 10s linear forwards;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ken-burns {
+    animation: none;
+  }
+}

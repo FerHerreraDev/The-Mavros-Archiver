@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/guards'
 import { seriesFormSchema } from '@/lib/movies'
-import { BACKDROP_MAX_WIDTH, processPoster, uploadPoster } from '@/lib/poster/thumbhash'
+import { BACKDROP_MAX_WIDTH, accentColor, processPoster, uploadPoster } from '@/lib/poster/thumbhash'
 import type { MovieActionResult } from '@/lib/actions/movie.actions'
 
 const SERIES_PATH = '/dashboard/admin/series'
@@ -33,12 +33,21 @@ async function prepare(formData: FormData, supabase: Parameters<typeof uploadPos
     processPoster(parsed.data.poster_url),
     processPoster(parsed.data.backdrop_url, undefined, BACKDROP_MAX_WIDTH),
   ])
-  const [poster_image_url, backdrop_image_url] = await Promise.all([
+  const [poster_image_url, backdrop_image_url, accent_color] = await Promise.all([
     poster.image ? uploadPoster(supabase, poster.image) : null,
     backdrop.image ? uploadPoster(supabase, backdrop.image) : null,
+    // El color de la portada sale de la imagen horizontal (TMDB-07)
+    backdrop.image ? accentColor(backdrop.image) : null,
   ])
   return {
-    data: { ...parsed.data, poster_thumbhash: poster.thumbhash, poster_image_url, backdrop_thumbhash: backdrop.thumbhash, backdrop_image_url },
+    data: {
+      ...parsed.data,
+      poster_thumbhash: poster.thumbhash,
+      poster_image_url,
+      backdrop_thumbhash: backdrop.thumbhash,
+      backdrop_image_url,
+      accent_color,
+    },
   }
 }
 

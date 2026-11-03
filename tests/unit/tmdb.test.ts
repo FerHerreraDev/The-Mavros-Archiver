@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createTmdb, fillEmpty, isGenericEpisodeTitle, normalizeGenreList } from '@/lib/tmdb/client.mjs'
+import { createTmdb, fillEmpty, isGenericEpisodeTitle, normalizeGenreList, pickCast, pickLogo, pickTrailer } from '@/lib/tmdb/client.mjs'
 import { normalizeGenres } from '@/lib/movies'
 
 type Routes = Record<string, unknown>
@@ -75,6 +75,9 @@ describe('TMDB: búsqueda y detalles (TMDB-02)', () => {
       genres: ['drama', 'crimen'],
       poster_url: 'https://img.test/t/p/w780/p.jpg',
       backdrop_url: 'https://img.test/t/p/w1280/b.jpg',
+      logo_url: null,
+      trailer_key: null,
+      cast: [],
     })
   })
 
@@ -83,6 +86,71 @@ describe('TMDB: búsqueda y detalles (TMDB-02)', () => {
     const tmdb = createTmdb(env(), f.impl)!
     expect((await tmdb.movie(129))?.original_title).toBe('千と千尋の神隠し')
     expect(await tmdb.movie(999)).toBeNull()
+  })
+})
+
+describe('TMDB: logo, tráiler y reparto (TMDB-06)', () => {
+  it('vienen en la misma petición de detalles', async () => {
+    const f = fakeFetch({
+      '/3/movie/21484?es-MX': {
+        id: 21484,
+        title: 'Posesión',
+        original_title: 'Possession',
+        overview: 'Berlín…',
+        release_date: '1981-05-27',
+        genres: [{ name: 'Terror' }],
+        poster_path: '/p.jpg',
+        backdrop_path: '/b.jpg',
+        images: { logos: [{ file_path: '/en.png', iso_639_1: 'en', vote_average: 5 }] },
+        videos: { results: [{ key: 'CTB15PPtMyA', site: 'YouTube', type: 'Trailer', iso_639_1: 'en', official: true }] },
+        credits: { cast: [{ name: 'Sam Neill', character: 'Mark', order: 1, profile_path: '/sn.jpg' }, { name: 'Isabelle Adjani', character: 'Anna', order: 0, profile_path: null }] },
+      },
+    })
+    const details = await createTmdb(env(), f.impl)!.movie(21484)
+    const asked = f.calls[0].url.searchParams
+    expect(asked.get('append_to_response')).toBe('images,videos,credits')
+    expect(asked.get('include_image_language')).toBe('es,en,null')
+    expect(details).toMatchObject({
+      backdrop_url: 'https://img.test/t/p/w1280/b.jpg',
+      logo_url: 'https://img.test/t/p/w500/en.png',
+      trailer_key: 'CTB15PPtMyA',
+      cast: [
+        { name: 'Isabelle Adjani', character: 'Anna', profile_url: null },
+        { name: 'Sam Neill', character: 'Mark', profile_url: 'https://img.test/t/p/w185/sn.jpg' },
+      ],
+    })
+  })
+
+  it('logo: solo PNG; español antes que inglés antes que sin idioma; el mejor votado', () => {
+    expect(
+      pickLogo([
+        { file_path: '/null.png', iso_639_1: null, vote_average: 9 },
+        { file_path: '/en.png', iso_639_1: 'en', vote_average: 9 },
+        { file_path: '/es-bajo.png', iso_639_1: 'es', vote_average: 2 },
+        { file_path: '/es-alto.png', iso_639_1: 'es', vote_average: 6 },
+        { file_path: '/es.svg', iso_639_1: 'es', vote_average: 10 },
+        { file_path: '/fr.png', iso_639_1: 'fr', vote_average: 10 },
+      ]),
+    ).toBe('/es-alto.png')
+    expect(pickLogo([{ file_path: '/x.svg', iso_639_1: 'es' }, { file_path: '/ja.png', iso_639_1: 'ja' }])).toBeNull()
+    expect(pickLogo()).toBeNull()
+  })
+
+  it('tráiler: YouTube; tráiler antes que teaser; español antes que inglés; oficial antes que no', () => {
+    const v = (key: string, extra: Record<string, unknown>) => ({ key, site: 'YouTube', type: 'Trailer', iso_639_1: 'en', official: false, ...extra })
+    expect(pickTrailer([v('teaserEsp01', { type: 'Teaser', iso_639_1: 'es' }), v('trailerEn01', {}), v('trailerEn02', { official: true })])).toBe('trailerEn02')
+    expect(pickTrailer([v('trailerEn01', { official: true }), v('trailerEs01', { iso_639_1: 'es' })])).toBe('trailerEs01')
+    expect(pickTrailer([v('vimeo00001', { site: 'Vimeo' }), v('clip000001', { type: 'Clip' }), v('toString', { type: 'toString' }), v('bad key!', {})])).toBeNull()
+    expect(pickTrailer([v('frTrailer1', { iso_639_1: 'fr' })])).toBeNull()
+  })
+
+  it('reparto: los primeros 10 en el orden de los créditos, textos acotados', () => {
+    const cast = Array.from({ length: 14 }, (_, i) => ({ name: `Actor ${i}`, character: 'x'.repeat(150), order: 13 - i, profile_path: null }))
+    const picked = pickCast([...cast, { order: -1, name: '' }], (_, p) => p ?? null)
+    expect(picked).toHaveLength(10)
+    expect(picked[0].name).toBe('Actor 13')
+    expect(picked[0].character).toHaveLength(100)
+    expect(pickCast(undefined, () => null)).toEqual([])
   })
 })
 

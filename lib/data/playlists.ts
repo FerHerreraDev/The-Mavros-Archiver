@@ -42,6 +42,24 @@ export async function playlistMembership(target: PlaylistTarget) {
   return (lists ?? []).map((l) => ({ id: l.id as string, name: l.name as string, contains: inLists.has(l.id) }))
 }
 
+/** Lo mismo para varias películas o series con dos consultas (las destacadas de la portada, CAT-07) */
+export async function playlistMemberships(targets: { kind: 'movie' | 'series'; id: string }[]) {
+  const supabase = await createClient()
+  const movieIds = targets.filter((t) => t.kind === 'movie').map((t) => t.id)
+  const seriesIds = targets.filter((t) => t.kind === 'series').map((t) => t.id)
+  const filters = [movieIds.length && `movie_id.in.(${movieIds.join(',')})`, seriesIds.length && `series_id.in.(${seriesIds.join(',')})`].filter(Boolean)
+  const [{ data: lists }, { data: items }] = await Promise.all([
+    supabase.from('playlists').select('id, name').order('created_at'),
+    filters.length ? supabase.from('playlist_items').select('playlist_id, movie_id, series_id').or(filters.join(',')) : Promise.resolve({ data: [] }),
+  ])
+  const result = new Map<string, { id: string; name: string; contains: boolean }[]>()
+  for (const t of targets) {
+    const inLists = new Set((items ?? []).filter((i) => (t.kind === 'movie' ? i.movie_id : i.series_id) === t.id).map((i) => i.playlist_id))
+    result.set(t.id, (lists ?? []).map((l) => ({ id: l.id as string, name: l.name as string, contains: inLists.has(l.id) })))
+  }
+  return result
+}
+
 async function loadItems(supabase: Supabase, playlistId: string): Promise<PlaylistItem[]> {
   const { data, error } = await supabase
     .from('playlist_items')

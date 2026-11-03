@@ -2,7 +2,7 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { isInProgress } from '@/lib/progress'
 import { nextEpisode, nextUp, seriesContinue, sortEpisodes, type EpisodeProgress } from '@/lib/series'
-import type { Movie, Series } from '@/lib/movies'
+import { formatDuration, seriesCount, type Movie, type Series } from '@/lib/movies'
 
 export type CatalogMovie = Pick<
   Movie,
@@ -19,6 +19,20 @@ export type CatalogEpisode = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_sec
   episode: number
   duration: number
 }
+/** Destacada de la portada (CAT-07): película o serie con imagen horizontal */
+export type FeaturedItem = {
+  kind: 'movie' | 'series'
+  id: string
+  href: string
+  title: string
+  meta: string[]
+  synopsis: string | null
+  backdrop: string
+  backdropThumbhash: string | null
+  logo: string | null
+  accent: string | null
+  publishedAt: string
+}
 export type ContinueItem = {
   movie: CatalogMovie
   positionSeconds: number
@@ -29,6 +43,10 @@ export type ContinueItem = {
 
 const CARD_FIELDS = 'id, slug, title, original_title, release_year, duration_seconds, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
 const SERIES_FIELDS = 'id, slug, title, original_title, release_year, genres, poster_url, poster_image_url, poster_thumbhash, published_at'
+const HERO_FIELDS =
+  'id, slug, title, release_year, genres, synopsis, backdrop_url, backdrop_image_url, backdrop_thumbhash, logo_url, logo_image_url, accent_color, published_at'
+/** Cuántas destacadas rota la portada (CAT-07) */
+export const FEATURED_MAX = 5
 const EPISODE_FIELDS = 'id, slug, title, duration_seconds, status, series_id, season_number, episode_number, synopsis, poster_url, poster_image_url, poster_thumbhash'
 
 type EpisodeRow = Pick<Movie, 'id' | 'slug' | 'title' | 'duration_seconds' | 'status' | 'synopsis' | 'poster_url' | 'poster_image_url' | 'poster_thumbhash'> & {
@@ -59,7 +77,7 @@ const toEpisode = (e: EpisodeRow): CatalogEpisode => ({
 export async function getCatalog(genre?: string) {
   const supabase = await createClient()
 
-  const [movies, series, episodes, progress] = await Promise.all([
+  const [movies, series, episodes, progress, heroMovies, heroSeries] = await Promise.all([
     supabase.from('movies').select(CARD_FIELDS).eq('status', 'published').is('series_id', null).order('published_at', { ascending: false }),
     supabase.from('series').select(SERIES_FIELDS).eq('status', 'published').order('published_at', { ascending: false }),
     supabase.from('movies').select(EPISODE_FIELDS).eq('status', 'published').not('series_id', 'is', null),
@@ -68,8 +86,23 @@ export async function getCatalog(genre?: string) {
       .select(`position_seconds, updated_at, movies!inner(${CARD_FIELDS}, status, series_id)`)
       .eq('movies.status', 'published')
       .order('updated_at', { ascending: false }),
+    supabase
+      .from('movies')
+      .select(`${HERO_FIELDS}, duration_seconds`)
+      .eq('status', 'published')
+      .is('series_id', null)
+      .not('backdrop_url', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(FEATURED_MAX),
+    supabase
+      .from('series')
+      .select(HERO_FIELDS)
+      .eq('status', 'published')
+      .not('backdrop_url', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(FEATURED_MAX),
   ])
-  for (const [name, res] of Object.entries({ movies, series, episodes, progress })) {
+  for (const [name, res] of Object.entries({ movies, series, episodes, progress, heroMovies, heroSeries })) {
     if (res.error) throw new Error(`[CATALOG] ${name} failed: ${res.error.message}`)
   }
 
@@ -128,7 +161,37 @@ export async function getCatalog(genre?: string) {
   const genres = [...new Set([...allMovies, ...allSeries].flatMap((m) => m.genres))].sort((a, b) => a.localeCompare(b, 'es'))
   const byGenre = <T extends { genres: string[] }>(list: T[]) => (genre ? list.filter((m) => m.genres.includes(genre)) : list)
 
-  return { genres, recent: byGenre(allMovies), series: byGenre(allSeries), continueWatching }
+  // Destacadas: las más recientes con imagen horizontal; una serie solo si ya tiene episodios (CAT-07)
+  type HeroRow = Pick<Movie, 'id' | 'slug' | 'title' | 'release_year' | 'genres' | 'synopsis' | 'backdrop_url' | 'backdrop_image_url' | 'backdrop_thumbhash' | 'logo_url' | 'logo_image_url' | 'accent_color'> & {
+    published_at: string
+    duration_seconds?: number
+  }
+  const hero = (row: HeroRow, kind: FeaturedItem['kind'], extra: string | null): FeaturedItem => ({
+    kind,
+    id: row.id,
+    href: kind === 'movie' ? `/dashboard/watch/${row.slug}` : `/dashboard/series/${row.slug}`,
+    title: row.title,
+    meta: [row.release_year ? String(row.release_year) : null, extra, ...row.genres.slice(0, 3)].filter((v): v is string => !!v),
+    synopsis: row.synopsis,
+    backdrop: (row.backdrop_image_url ?? row.backdrop_url)!,
+    backdropThumbhash: row.backdrop_thumbhash,
+    logo: row.logo_image_url ?? row.logo_url,
+    accent: row.accent_color,
+    publishedAt: row.published_at,
+  })
+  const featured = [
+    ...((heroMovies.data ?? []) as HeroRow[]).map((m) => hero(m, 'movie', m.duration_seconds ? formatDuration(m.duration_seconds) : null)),
+    ...((heroSeries.data ?? []) as HeroRow[])
+      .filter((s) => seriesById.has(s.id))
+      .map((s) => {
+        const show = seriesById.get(s.id)!
+        return hero(s, 'series', seriesCount(show.seasons, show.episodes))
+      }),
+  ]
+    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
+    .slice(0, FEATURED_MAX)
+
+  return { genres, recent: byGenre(allMovies), series: byGenre(allSeries), continueWatching, featured }
 }
 
 /**

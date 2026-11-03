@@ -117,3 +117,75 @@ describe('getWatchable (WATCH-01)', () => {
     expect(await getWatchable(`no-existe-${tag}`)).toBeNull()
   })
 })
+
+describe('CAT-07 destacadas de la portada', () => {
+  const hero: Record<string, string> = {}
+  const BACKDROP = 'https://image.invalid/b.jpg'
+
+  beforeAll(async () => {
+    const movie = async (key: string, fields: Record<string, unknown>) => {
+      const slug = `hero-${key}-${tag}`
+      const { data } = await adminClient()
+        .from('movies')
+        .insert({ slug, title: `Hero ${key}`, duration_seconds: 5400, release_year: 1981, genres: ['terror', 'drama'], hls_path: `movies/${slug}/master.m3u8`, ...fields })
+        .select('id')
+        .single()
+      hero[key] = data!.id
+    }
+    await movie('nobackdrop', { status: 'published' })
+    await movie('draft', { status: 'draft', backdrop_url: BACKDROP })
+    const { data: lonely } = await adminClient().from('series').insert({ slug: `hero-lonely-${tag}`, title: 'Sin episodios', status: 'published', backdrop_url: BACKDROP }).select('id').single()
+    const { data: show } = await adminClient()
+      .from('series')
+      .insert({ slug: `hero-show-${tag}`, title: 'Hero serie', status: 'published', backdrop_url: BACKDROP, release_year: 2021, logo_url: 'https://image.invalid/l.png' })
+      .select('id')
+      .single()
+    Object.assign(hero, { lonely: lonely!.id, show: show!.id })
+    await movie('episode', { status: 'published', series_id: show!.id, season_number: 1, episode_number: 1 })
+    await movie('movie', {
+      status: 'published',
+      synopsis: 'Berlín…',
+      backdrop_url: BACKDROP,
+      backdrop_image_url: 'https://image.invalid/copia.webp',
+      logo_url: 'https://image.invalid/l.png',
+      accent_color: '#c81e1e',
+    })
+  })
+
+  afterAll(async () => {
+    await adminClient().from('movies').delete().like('slug', `hero-%-${tag}`)
+    await adminClient().from('series').delete().like('slug', `hero-%-${tag}`)
+  })
+
+  it('las más recientes con imagen horizontal (películas y series con episodios), a lo más 5', async () => {
+    await as(viewer)
+    const { featured } = await getCatalog()
+    expect(featured.length).toBeLessThanOrEqual(5)
+    const ids = featured.map((f) => f.id)
+    expect(ids.indexOf(hero.movie)).toBeLessThan(ids.indexOf(hero.show))
+    expect(ids.indexOf(hero.show)).toBeGreaterThanOrEqual(0)
+    for (const key of ['nobackdrop', 'draft', 'lonely', 'episode']) expect(ids).not.toContain(hero[key])
+  })
+
+  it('cada destacada trae lo que pinta la portada', async () => {
+    await as(viewer)
+    const { featured } = await getCatalog()
+    expect(featured.find((f) => f.id === hero.movie)).toMatchObject({
+      kind: 'movie',
+      href: `/dashboard/watch/hero-movie-${tag}`,
+      title: 'Hero movie',
+      meta: ['1981', '1 h 30 min', 'terror', 'drama'],
+      synopsis: 'Berlín…',
+      backdrop: 'https://image.invalid/copia.webp',
+      logo: 'https://image.invalid/l.png',
+      accent: '#c81e1e',
+    })
+    expect(featured.find((f) => f.id === hero.show)).toMatchObject({
+      kind: 'series',
+      href: `/dashboard/series/hero-show-${tag}`,
+      meta: ['2021', '1 episodio'],
+      backdrop: BACKDROP,
+      accent: null,
+    })
+  })
+})

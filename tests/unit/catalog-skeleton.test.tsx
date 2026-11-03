@@ -38,6 +38,24 @@ describe('CatalogSkeleton (LOAD-01)', () => {
   })
 })
 
+describe('CatalogSkeleton de la portada (LOAD-01, CAT-07, CAT-08)', () => {
+  const html = renderToStaticMarkup(<CatalogSkeleton variant="home" />)
+
+  it('copia la portada: destacada grande, chips y filas con el ancho real de las tarjetas', () => {
+    expect(html).toContain('data-testid="skeleton-hero"')
+    expect(html).toContain('min-h-[460px]')
+    expect(html.match(/data-testid="skeleton-card"/g)?.length).toBe(12)
+    expect(html).toContain('w-[42%] shrink-0 sm:w-[30%] md:w-[23%] lg:w-[18%]')
+    expect(html).not.toContain('grid grid-cols-2')
+  })
+
+  it('sigue siendo "cargando" para lectores de pantalla y aparece con retraso', () => {
+    expect(html).toMatch(/role="status"/)
+    expect(html).toMatch(/class="skeleton-delayed/)
+    expect(html.match(/<section[^>]*aria-hidden="true"/g)?.length).toBe(4)
+  })
+})
+
 /** Mini-buscador de fragmentos por atributo (sin DOM en el entorno node) */
 class DOMParserLike {
   constructor(private html: string) {}

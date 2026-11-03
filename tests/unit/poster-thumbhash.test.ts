@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { thumbHashToApproximateAspectRatio, thumbHashToRGBA } from 'thumbhash'
-import { processPoster, optimizePoster, thumbhashFromImage, POSTER_MAX_WIDTH } from '@/lib/poster/thumbhash'
+import { processPoster, optimizePoster, thumbhashFromImage, accentColor, POSTER_MAX_WIDTH } from '@/lib/poster/thumbhash'
+import { toAccentHex } from '@/lib/poster/image.mjs'
 import sharp from 'sharp'
 
 const thumbOf = async (...args: Parameters<typeof processPoster>) => (await processPoster(...args)).thumbhash
@@ -111,5 +112,29 @@ describe('copia optimizada (LOAD-07)', () => {
     expect(await processPoster(null)).toEqual({ thumbhash: null, image: null })
     const fetchImpl = vi.fn<typeof fetch>(async () => { throw new Error('x') })
     expect(await processPoster('https://cdn.example.com/p.png', { fetchImpl, lookup })).toEqual({ thumbhash: null, image: null })
+  })
+})
+
+describe('color de la portada (TMDB-07)', () => {
+  it('formato #rrggbb con la luminosidad acotada (ni negro ni blanco)', () => {
+    const lightness = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      return (Math.max(r, g, b) + Math.min(r, g, b)) / 2
+    }
+    for (const rgb of [{ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }, { r: 200, g: 30, b: 30 }, { r: 250, g: 240, b: 200 }]) {
+      const hex = toAccentHex(rgb)
+      expect(hex).toMatch(/^#[0-9a-f]{6}$/)
+      expect(lightness(hex)).toBeGreaterThanOrEqual(0.21)
+      expect(lightness(hex)).toBeLessThanOrEqual(0.46)
+    }
+    // Un color que ya está en rango no cambia
+    expect(toAccentHex({ r: 200, g: 30, b: 30 })).toBe('#c81e1e')
+  })
+
+  it('sale del color dominante de la imagen; bytes que no son imagen → null', async () => {
+    const red = await sharp({ create: { width: 64, height: 36, channels: 3, background: { r: 200, g: 30, b: 30 } } }).png().toBuffer()
+    const hex = (await accentColor(red))!
+    expect(parseInt(hex.slice(1, 3), 16)).toBeGreaterThan(parseInt(hex.slice(3, 5), 16) + 80)
+    expect(await accentColor(Buffer.from('no es imagen'))).toBeNull()
   })
 })

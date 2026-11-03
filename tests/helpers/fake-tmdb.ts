@@ -51,5 +51,8 @@ export const tmdbFixtures = (showId: number, movieId: number) => ({
     genres: [{ name: 'Animación' }, { name: 'Ciencia ficción' }],
     poster_path: '/mp.jpg',
     backdrop_path: '/mb.jpg',
+    images: { logos: [{ file_path: '/ml.png', iso_639_1: 'es', vote_average: 5 }] },
+    videos: { results: [{ key: 'akiraTrail1', site: 'YouTube', type: 'Trailer', iso_639_1: 'es', official: true }] },
+    credits: { cast: [{ name: 'Mitsuo Iwata', character: 'Kaneda', order: 0, profile_path: '/mi.jpg' }] },
   },
 })

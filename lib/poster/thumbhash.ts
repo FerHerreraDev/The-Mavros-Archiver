@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchPosterBytes, type FetchPosterOptions } from './fetch-poster'
 import { POSTER_MAX_WIDTH, optimizeImage, processImageBytes, uploadImage } from './image.mjs'
 
-export { POSTER_MAX_WIDTH, POSTERS_BUCKET, BACKDROP_MAX_WIDTH, thumbhashFromImage } from './image.mjs'
+export { POSTER_MAX_WIDTH, POSTERS_BUCKET, BACKDROP_MAX_WIDTH, LOGO_MAX_WIDTH, accentColor, thumbhashFromImage } from './image.mjs'
 
 /** Copia optimizada (LOAD-07): WebP, máx. 600 px de ancho (o [maxWidth]), sin agrandar, sin metadatos */
 export async function optimizePoster(bytes: Buffer, maxWidth = POSTER_MAX_WIDTH): Promise<Buffer> {

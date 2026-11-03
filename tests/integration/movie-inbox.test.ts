@@ -211,8 +211,12 @@ describe('datos automáticos con TMDB (TMDB-04)', () => {
     expect(res.headers.get('content-type')).toBe('image/webp')
   })
 
-  it('la película se completa sin cambiar su título', async () => {
-    const { data } = await adminClient().from('movies').select('title, release_year, synopsis, genres, tmdb_id, poster_url').eq('slug', `peli-tmdb-${tag}`).single()
+  it('la película se completa sin cambiar su título, con imagen horizontal, logo, tráiler y reparto (TMDB-06)', async () => {
+    const { data } = await adminClient()
+      .from('movies')
+      .select('title, release_year, synopsis, genres, tmdb_id, poster_url, backdrop_url, logo_url, trailer_key, cast')
+      .eq('slug', `peli-tmdb-${tag}`)
+      .single()
     expect(data).toEqual({
       title: `Peli TMDB ${tag}`,
       release_year: 1988,
@@ -220,6 +224,10 @@ describe('datos automáticos con TMDB (TMDB-04)', () => {
       genres: ['animación', 'ciencia ficción'],
       tmdb_id: MOVIE,
       poster_url: 'https://image.invalid/t/p/w780/mp.jpg',
+      backdrop_url: 'https://image.invalid/t/p/w1280/mb.jpg',
+      logo_url: 'https://image.invalid/t/p/w500/ml.png',
+      trailer_key: 'akiraTrail1',
+      cast: [{ name: 'Mitsuo Iwata', character: 'Kaneda', profile_url: 'https://image.invalid/t/p/w185/mi.jpg' }],
     })
   })
 

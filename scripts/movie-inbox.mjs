@@ -35,7 +35,7 @@ function notify(title, message) {
   }
 }
 
-function readEnv() {
+export function readEnv() {
   return Object.fromEntries(
     readFileSync(process.env.MAVROS_ENV_FILE ?? path.join(ROOT, '.env.local'), 'utf8')
       .split('\n')
@@ -45,7 +45,7 @@ function readEnv() {
   )
 }
 
-function supabaseAdmin(env) {
+export function supabaseAdmin(env) {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Faltan NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY en .env.local')
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 }

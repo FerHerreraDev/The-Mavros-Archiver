@@ -80,3 +80,63 @@ test('WATCH-01 un user que abre un borrador o un slug inexistente → 404', asyn
     expect(res?.status()).toBe(404)
   }
 })
+
+// Las destacadas son las más recientes de todo el catálogo: estas dos no corren a la vez
+test.describe.serial('CAT-07 portada', () => {
+  test('CAT-07 portada: la destacada más reciente con su título, datos y "Reproducir"; se puede pausar y elegir', async ({ page }) => {
+    const first = await movie(`Destacada A ${tag}`, { status: 'published', synopsis: 'Primera.', backdrop_url: 'https://image.invalid/a.jpg', accent_color: '#c81e1e' })
+    const second = await movie(`Destacada B ${tag}`, { status: 'published', synopsis: 'Segunda.', backdrop_url: 'https://image.invalid/b.jpg', genres: [genre] })
+
+    await loginAs(page, viewer)
+    const hero = page.getByRole('region', { name: 'Destacadas' })
+    await expect(hero.getByRole('heading', { name: `Destacada B ${tag}` })).toBeVisible()
+    await expect(hero).toContainText('Segunda.')
+    await expect(hero).toContainText(`2024 · 20 min · ${genre}`.toUpperCase(), { ignoreCase: true })
+    await expect(hero.getByRole('button', { name: /agregar a lista/i })).toBeVisible()
+
+    // Pausar: no cambia sola
+    await hero.getByRole('button', { name: 'Pausar destacadas' }).click()
+    await expect(hero.getByRole('button', { name: 'Reanudar destacadas' })).toBeVisible()
+
+    await hero.getByRole('button', { name: `Ver destacada 2: Destacada A ${tag}` }).click()
+    await expect(hero.getByRole('heading', { name: `Destacada A ${tag}` })).toBeVisible()
+    await expect(hero.getByRole('button', { name: `Ver destacada 2: Destacada A ${tag}` })).toHaveAttribute('aria-current', 'true')
+    await expect(hero.getByTestId('featured-accent')).toBeVisible()
+
+    await hero.getByRole('link', { name: 'Reproducir' }).click()
+    await expect(page).toHaveURL(new RegExp(`/dashboard/watch/${first.slug}$`))
+    expect(second.slug).toBeTruthy()
+  })
+
+  test('CAT-07 con "reducir movimiento" las destacadas no rotan solas', async ({ page }) => {
+    await movie(`Quieta A ${tag}`, { status: 'published', backdrop_url: 'https://image.invalid/a.jpg' })
+    await movie(`Quieta B ${tag}`, { status: 'published', backdrop_url: 'https://image.invalid/b.jpg' })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await loginAs(page, viewer)
+    const hero = page.getByRole('region', { name: 'Destacadas' })
+    await expect(hero.getByRole('heading', { name: `Quieta B ${tag}` })).toBeVisible()
+    await expect(hero.getByRole('button', { name: /pausar destacadas/i })).toHaveCount(0)
+    await page.waitForTimeout(9_000)
+    await expect(hero.getByRole('heading', { name: `Quieta B ${tag}` })).toBeVisible()
+  })
+})
+
+test('CAT-08 filas que se deslizan: una por género (con 2 o más) y flechas para avanzar', async ({ page }) => {
+  const rowGenre = `fila${tag}`
+  for (let i = 0; i < 9; i++) await movie(`Fila ${i} ${tag}`, { status: 'published', genres: [rowGenre] })
+  await movie(`Solita ${tag}`, { status: 'published', genres: [`solo${tag}`] })
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await loginAs(page, viewer)
+  await expect(page.getByRole('region', { name: 'Recién agregadas' }).getByRole('link', { name: `Ver Fila 8 ${tag}` })).toBeVisible()
+  const row = page.getByRole('region', { name: rowGenre })
+  await expect(row.getByRole('link', { name: new RegExp(`^Ver Fila \\d ${tag}$`) })).toHaveCount(9)
+  // Una sola tarjeta no hace fila
+  await expect(page.getByRole('region', { name: `solo${tag}` })).toHaveCount(0)
+
+  const scroller = row.getByTestId('catalog-row')
+  await expect(row.getByRole('button', { name: `Anteriores de ${rowGenre}` })).toBeDisabled()
+  await row.getByRole('button', { name: `Más de ${rowGenre}` }).click()
+  await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(200)
+  await expect(row.getByRole('button', { name: `Anteriores de ${rowGenre}` })).toBeEnabled()
+})

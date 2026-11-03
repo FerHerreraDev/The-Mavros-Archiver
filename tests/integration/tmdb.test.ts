@@ -63,7 +63,7 @@ describe('TMDB en el panel (TMDB-02)', () => {
     })
   })
 
-  it('elegir una película la llena (sin imagen horizontal); un user no puede aplicar', async () => {
+  it('elegir una película la llena (con imagen horizontal, logo, tráiler y reparto, TMDB-06); un user no puede aplicar', async () => {
     const { data: movie } = await adminClient()
       .from('movies')
       .insert({ slug: `tmdb-peli-${tag}`, title: 'Akira', duration_seconds: 10, hls_path: 'ladder/master.m3u8' })
@@ -74,7 +74,17 @@ describe('TMDB en el panel (TMDB-02)', () => {
     await as(boss)
     await applyTmdbAction({ kind: 'movie', id: movie!.id, tmdbId: MOVIE })
     const { data } = await adminClient().from('movies').select('*').eq('id', movie!.id).single()
-    expect(data).toMatchObject({ title: 'Akira', synopsis: 'Neo-Tokio, 2019.', release_year: 1988, genres: ['animación', 'ciencia ficción'], tmdb_id: MOVIE })
+    expect(data).toMatchObject({
+      title: 'Akira',
+      synopsis: 'Neo-Tokio, 2019.',
+      release_year: 1988,
+      genres: ['animación', 'ciencia ficción'],
+      backdrop_url: 'https://image.invalid/t/p/w1280/mb.jpg',
+      logo_url: 'https://image.invalid/t/p/w500/ml.png',
+      trailer_key: 'akiraTrail1',
+      cast: [{ name: 'Mitsuo Iwata', character: 'Kaneda', profile_url: 'https://image.invalid/t/p/w185/mi.jpg' }],
+      tmdb_id: MOVIE,
+    })
   })
 })
 

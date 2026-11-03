@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 export type MovieStatus = 'draft' | 'published'
 
+export type CastMember = { name: string; character: string | null; profile_url: string | null }
+
 export type Movie = {
   id: string
   slug: string
@@ -17,6 +19,19 @@ export type Movie = {
   /** Copia optimizada en el bucket `posters` (LOAD-07); si no hay, se usa poster_url */
   poster_image_url: string | null
   hls_path: string
+  /** Imagen horizontal de fondo (SER-17, TMDB-06) */
+  backdrop_url: string | null
+  backdrop_image_url: string | null
+  backdrop_thumbhash: string | null
+  /** Logo del título y su copia optimizada (TMDB-06) */
+  logo_url: string | null
+  logo_image_url: string | null
+  /** Tráiler de YouTube: la clave de watch?v= (TMDB-06) */
+  trailer_key: string | null
+  /** Reparto principal (TMDB-06) */
+  cast: CastMember[]
+  /** Color dominante de la imagen horizontal, "#rrggbb" (TMDB-07) */
+  accent_color: string | null
   /** Película o serie en TMDB (TMDB-02) */
   tmdb_id: number | null
   /** Episodio de una serie (SER-03): los tres juntos o null. En un episodio el póster es su imagen 16:9 (SER-19) */
@@ -59,12 +74,7 @@ const optionalText = (max: number, label: string) =>
     .max(max, `${label}: máximo ${max} caracteres`)
     .transform((v) => (v === '' ? null : v))
 
-export type Series = Omit<Movie, 'duration_seconds' | 'hls_path' | 'series_id' | 'season_number' | 'episode_number'> & {
-  /** Imagen horizontal de fondo de su página (SER-17) */
-  backdrop_url: string | null
-  backdrop_image_url: string | null
-  backdrop_thumbhash: string | null
-}
+export type Series = Omit<Movie, 'duration_seconds' | 'hls_path' | 'series_id' | 'season_number' | 'episode_number'>
 
 const optionalInt = (min: number, max: number, message: string) =>
   z
@@ -161,6 +171,12 @@ export type MovieFormData = z.output<typeof movieFormSchema>
 export function episodeSlug(seriesSlug: string, season: number, episode: number) {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${seriesSlug.slice(0, 90).replace(/-+$/, '')}-s${pad(season)}e${pad(episode)}`
+}
+
+/** "2 temporadas" o, si es una sola, "8 episodios" (SER-08) */
+export function seriesCount(seasons: number, episodes: number) {
+  if (seasons > 1) return `${seasons} temporadas`
+  return episodes === 1 ? '1 episodio' : `${episodes} episodios`
 }
 
 export function formatDuration(seconds: number) {
