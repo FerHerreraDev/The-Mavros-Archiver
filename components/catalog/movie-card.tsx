@@ -11,7 +11,9 @@ type CardProps = { href: string; label: string; title: string; meta: string; pos
 
 function PosterCard({ href, label, title, meta, poster, ratio = null }: CardProps) {
   return (
-    <Link href={href} className="group block focus-visible:outline-none" aria-label={label}>
+    // Sin precarga: el catálogo tiene decenas de tarjetas y precargar cada página saturaba la conexión
+    // (y el servidor) justo cuando tocabas una. Se pide al tocarla.
+    <Link href={href} prefetch={false} className="group block focus-visible:outline-none" aria-label={label}>
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-card shadow-black/60 transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.04] group-hover:shadow-xl group-focus-visible:ring-2 group-focus-visible:ring-accent motion-reduce:transition-none motion-reduce:group-hover:scale-100">
         <PosterImage
           src={poster.poster_image_url ?? poster.poster_url}
@@ -45,12 +47,13 @@ function PosterCard({ href, label, title, meta, poster, ratio = null }: CardProp
 type Props = { movie: CatalogMovie; positionSeconds?: number; episode?: ContinueItem['episode'] }
 
 /**
- * Tarjeta de póster (CAT-03). Con `positionSeconds` muestra la barra de "Seguir viendo" (CAT-06).
+ * Tarjeta de póster (CAT-03). Lleva al detalle de la película (CAT-09); en "Seguir viendo", a reproducir. Con `positionSeconds` muestra la barra de "Seguir viendo" (CAT-06).
  * Un episodio en "Seguir viendo" lleva el título de su serie y "T1:E5 · título" (SER-11).
  */
 export function MovieCard({ movie, positionSeconds, episode }: Props) {
   const ratio = positionSeconds === undefined ? null : progressRatio(positionSeconds, movie.duration_seconds)
-  const href = `/dashboard/watch/${movie.slug}`
+  // "Seguir viendo" va directo a reproducir; las demás, a su detalle (CAT-09)
+  const href = positionSeconds === undefined ? `/dashboard/movie/${movie.slug}` : `/dashboard/watch/${movie.slug}`
 
   if (episode) {
     const tag = episodeLabel(episode.season, episode.episode)

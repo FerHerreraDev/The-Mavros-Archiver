@@ -27,7 +27,7 @@ test.afterAll(async () => {
 
 const card = (page: import('@playwright/test').Page, title: string) => page.getByRole('link', { name: `Ver ${title}` })
 
-test('CAT-01 / CAT-03 publicadas con título, año y duración; borradores no aparecen; la tarjeta lleva a ver', async ({ page }) => {
+test('CAT-01 / CAT-03 publicadas con título, año y duración; borradores no aparecen; la tarjeta lleva a su detalle y de ahí a ver', async ({ page }) => {
   const pub = await movie(`Pub ${tag}`, { status: 'published' })
   await movie(`Draft ${tag}`, { status: 'draft' })
 
@@ -38,6 +38,8 @@ test('CAT-01 / CAT-03 publicadas con título, año y duración; borradores no ap
   await expect(card(page, `Draft ${tag}`)).toHaveCount(0)
 
   await card(page, `Pub ${tag}`).click()
+  await expect(page).toHaveURL(new RegExp(`/dashboard/movie/${pub.slug}$`))
+  await page.getByRole('link', { name: 'Reproducir' }).click()
   await expect(page).toHaveURL(new RegExp(`/dashboard/watch/${pub.slug}$`))
 })
 
@@ -103,6 +105,7 @@ test.describe.serial('CAT-07 portada', () => {
     await expect(hero.getByRole('button', { name: `Ver destacada 2: Destacada A ${tag}` })).toHaveAttribute('aria-current', 'true')
     await expect(hero.getByTestId('featured-accent')).toBeVisible()
 
+    await expect(hero.getByRole('link', { name: 'Más información' })).toHaveAttribute('href', `/dashboard/movie/${first.slug}`)
     await hero.getByRole('link', { name: 'Reproducir' }).click()
     await expect(page).toHaveURL(new RegExp(`/dashboard/watch/${first.slug}$`))
     expect(second.slug).toBeTruthy()
@@ -139,4 +142,56 @@ test('CAT-08 filas que se deslizan: una por género (con 2 o más) y flechas par
   await row.getByRole('button', { name: `Más de ${rowGenre}` }).click()
   await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(200)
   await expect(row.getByRole('button', { name: `Anteriores de ${rowGenre}` })).toBeEnabled()
+})
+
+test('CAT-09 / CAT-10 detalle: datos, continuar, tráiler, reparto y "Más como esta"; borrador → 404', async ({ page }) => {
+  const g = `det${tag}`
+  const main = await movie(`Detalle ${tag}`, {
+    status: 'published',
+    synopsis: 'Berlín, antes de la caída del muro.',
+    original_title: 'Original distinto',
+    genres: [g],
+    backdrop_url: 'https://image.invalid/b.jpg',
+    accent_color: '#c81e1e',
+    trailer_key: 'CTB15PPtMyA',
+    cast: [
+      { name: 'Isabelle Adjani', character: 'Anna', profile_url: null },
+      { name: 'Sam Neill', character: 'Mark', profile_url: null },
+    ],
+  })
+  await movie(`Parecida ${tag}`, { status: 'published', genres: [g] })
+  const draft = await movie(`Escondida ${tag}`, { status: 'draft', genres: [g] })
+  await adminClient().from('watch_progress').insert({ user_id: viewer.id, movie_id: main.id, position_seconds: 600 })
+
+  await loginAs(page, viewer)
+  await page.goto(`/dashboard/movie/${main.slug}`)
+  await expect(page.getByRole('heading', { level: 1, name: `Detalle ${tag}` })).toBeVisible()
+  await expect(page.getByText('Original distinto')).toBeVisible()
+  await expect(page.getByText(`2024 · 20 min · ${g}`, { exact: false })).toBeVisible()
+  await expect(page.getByText('Berlín, antes de la caída del muro.')).toBeVisible()
+  await expect(page.getByTestId('detail-accent')).toBeAttached()
+  await expect(page.getByRole('progressbar', { name: 'Progreso' })).toHaveAttribute('aria-valuenow', '50')
+
+  // Tráiler: ventana con el video de YouTube (sin cookies); Esc la cierra y quita el video
+  await page.getByRole('button', { name: 'Ver tráiler' }).click()
+  const dialog = page.getByRole('dialog', { name: `Tráiler · Detalle ${tag}` })
+  await expect(dialog.locator('iframe')).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/CTB15PPtMyA\?autoplay=1/)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('iframe')).toHaveCount(0)
+
+  const cast = page.getByRole('region', { name: 'Reparto' })
+  await expect(cast.getByText('Isabelle Adjani')).toBeVisible()
+  await expect(cast.getByText('Mark')).toBeVisible()
+
+  const similar = page.getByRole('region', { name: 'Más como esta' })
+  await expect(similar.getByRole('link', { name: `Ver Parecida ${tag}` })).toBeVisible()
+  await expect(similar.getByRole('link', { name: `Ver Escondida ${tag}` })).toHaveCount(0)
+  await expect(similar.getByRole('link', { name: `Ver Detalle ${tag}` })).toHaveCount(0)
+
+  // El clic de detalle a reproducir ya lo cubre CAT-01
+  await expect(page.getByRole('link', { name: /continuar desde 10:00/i })).toHaveAttribute('href', `/dashboard/watch/${main.slug}`)
+
+  const res = await page.goto(`/dashboard/movie/${draft.slug}`)
+  expect(res?.status()).toBe(404)
 })

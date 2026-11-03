@@ -12,6 +12,8 @@ export function GenreFilter({ genres, active }: { genres: string[]; active?: str
     <Link
       key={label}
       href={href}
+      // Cada género es el catálogo completo filtrado: no se precargan todos (ver movie-card)
+      prefetch={false}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
         CHIP,

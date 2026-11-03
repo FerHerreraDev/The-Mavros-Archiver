@@ -194,3 +194,25 @@ export function formatTimestamp(seconds: number) {
   const s = String(total % 60).padStart(2, '0')
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
 }
+
+/** Cuántas "Más como esta" muestra el detalle (CAT-10) */
+export const SIMILAR_MAX = 12
+
+/**
+ * "Más como esta" (CAT-10): las que comparten al menos un género, primero las que comparten más y,
+ * a igualdad, la publicada más recientemente. Nunca la misma.
+ */
+export function similarTitles<T extends { id: string; genres: string[]; published_at: string | null }>(
+  target: { id: string; genres: string[] },
+  candidates: T[],
+  max = SIMILAR_MAX,
+): T[] {
+  const genres = new Set(target.genres)
+  return candidates
+    .filter((c) => c.id !== target.id)
+    .map((c) => ({ c, shared: c.genres.filter((g) => genres.has(g)).length }))
+    .filter((x) => x.shared > 0)
+    .sort((a, b) => b.shared - a.shared || Date.parse(b.c.published_at ?? '') - Date.parse(a.c.published_at ?? ''))
+    .slice(0, max)
+    .map((x) => x.c)
+}

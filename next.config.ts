@@ -7,10 +7,11 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Pantalla completa y PiP del reproductor sí; cámara, micro, ubicación, etc. no
+  // Pantalla completa y PiP del reproductor (y del tráiler de YouTube, CAT-09) sí; cámara, micro, ubicación, etc. no
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self), picture-in-picture=(self)",
+    value:
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self "https://www.youtube-nocookie.com"), picture-in-picture=(self "https://www.youtube-nocookie.com")',
   },
   // Solo tiene efecto en HTTPS; en localhost el navegador lo ignora
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },

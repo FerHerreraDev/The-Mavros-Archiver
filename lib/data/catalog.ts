@@ -2,7 +2,7 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { isInProgress } from '@/lib/progress'
 import { nextEpisode, nextUp, seriesContinue, sortEpisodes, type EpisodeProgress } from '@/lib/series'
-import { formatDuration, seriesCount, type Movie, type Series } from '@/lib/movies'
+import { formatDuration, seriesCount, similarTitles, type Movie, type Series } from '@/lib/movies'
 
 export type CatalogMovie = Pick<
   Movie,
@@ -24,6 +24,8 @@ export type FeaturedItem = {
   kind: 'movie' | 'series'
   id: string
   href: string
+  /** Detalle de la película (CAT-09); una serie ya abre su página con href */
+  infoHref: string | null
   title: string
   meta: string[]
   synopsis: string | null
@@ -170,6 +172,7 @@ export async function getCatalog(genre?: string) {
     kind,
     id: row.id,
     href: kind === 'movie' ? `/dashboard/watch/${row.slug}` : `/dashboard/series/${row.slug}`,
+    infoHref: kind === 'movie' ? `/dashboard/movie/${row.slug}` : null,
     title: row.title,
     meta: [row.release_year ? String(row.release_year) : null, extra, ...row.genres.slice(0, 3)].filter((v): v is string => !!v),
     synopsis: row.synopsis,
@@ -192,6 +195,31 @@ export async function getCatalog(genre?: string) {
     .slice(0, FEATURED_MAX)
 
   return { genres, recent: byGenre(allMovies), series: byGenre(allSeries), continueWatching, featured }
+}
+
+/**
+ * Detalle de una película (CAT-09, CAT-10): la película, el progreso del usuario y "Más como esta".
+ * null si no la puede ver o si es un episodio (los episodios viven en su serie).
+ */
+export async function getMovieDetail(slug: string) {
+  const supabase = await createClient()
+  const { data } = await supabase.from('movies').select('*').eq('slug', slug).is('series_id', null).maybeSingle()
+  if (!data) return null
+  const movie = data as Movie
+
+  const [{ data: progress }, { data: candidates, error }] = await Promise.all([
+    supabase.from('watch_progress').select('position_seconds').eq('movie_id', movie.id).maybeSingle(),
+    movie.genres.length
+      ? supabase.from('movies').select(CARD_FIELDS).eq('status', 'published').is('series_id', null).overlaps('genres', movie.genres)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (error) throw new Error(`[DETAIL] similar failed: ${error.message}`)
+
+  return {
+    movie,
+    positionSeconds: progress ? Number(progress.position_seconds) : null,
+    similar: similarTitles(movie, (candidates ?? []) as CatalogMovie[]),
+  }
 }
 
 /**

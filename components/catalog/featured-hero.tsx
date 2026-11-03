@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m, useReducedMotion } from 'motion/react'
-import { Pause, Play } from 'lucide-react'
+import { Info, Pause, Play } from 'lucide-react'
 import type { FeaturedItem } from '@/lib/data/catalog'
 import { AddToList } from '@/components/lists/add-to-list'
 import { PosterImage } from './poster-image'
@@ -17,7 +17,7 @@ export const FEATURED_INTERVAL_MS = 8000
 
 /**
  * Portada (CAT-07): la imagen horizontal de las destacadas a todo lo ancho, con su logo (o el
- * título), datos, sinopsis, "Reproducir" y "Agregar a lista". Rota sola cada 8 s; se detiene con
+ * título), datos, sinopsis, "Reproducir", "Más información" (CAT-09) y "Agregar a lista". Rota sola cada 8 s; se detiene con
  * el mouse o el foco encima, con el botón de pausa y con "reducir movimiento".
  */
 export function FeaturedHero({ items, lists }: Props) {
@@ -104,6 +104,15 @@ export function FeaturedHero({ items, lists }: Props) {
                     <Play className="h-4 w-4 fill-current" />
                     {item.kind === 'movie' ? 'Reproducir' : 'Ver serie'}
                   </Link>
+                  {item.infoHref && (
+                    <Link
+                      href={item.infoHref}
+                      className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-5 py-3 text-sm font-semibold text-foreground backdrop-blur transition-colors hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      <Info className="h-4 w-4" />
+                      Más información
+                    </Link>
+                  )}
                   {lists[item.id] && <AddToList target={item.kind === 'movie' ? { movieId: item.id } : { seriesId: item.id }} lists={lists[item.id]} />}
                 </div>
               </m.div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { slugify, normalizeGenres, movieFormSchema, formatDuration, type MovieFormInput } from '@/lib/movies'
+import { slugify, normalizeGenres, movieFormSchema, formatDuration, similarTitles, SIMILAR_MAX, type MovieFormInput } from '@/lib/movies'
 
 const base: MovieFormInput = {
   title: 'Chainsaw Man: Reze Arc',
@@ -118,5 +118,30 @@ describe('formatDuration', () => {
     [59, '59 s'],
   ])('%i s → %j', (s, text) => {
     expect(formatDuration(s)).toBe(text)
+  })
+})
+
+describe('similarTitles (CAT-10)', () => {
+  const m = (id: string, genres: string[], published_at: string | null = '2026-01-01T00:00:00Z') => ({ id, genres, published_at })
+
+  it('las que comparten más géneros primero; a igualdad, la más reciente; nunca la misma ni sin géneros en común', () => {
+    const target = m('t', ['terror', 'drama', 'misterio'])
+    const list = [
+      m('t', ['terror', 'drama']),
+      m('uno-viejo', ['terror'], '2025-01-01T00:00:00Z'),
+      m('uno-nuevo', ['drama'], '2026-06-01T00:00:00Z'),
+      m('dos', ['terror', 'misterio'], '2020-01-01T00:00:00Z'),
+      m('nada', ['comedia']),
+      m('vacía', []),
+    ]
+    expect(similarTitles(target, list).map((x) => x.id)).toEqual(['dos', 'uno-nuevo', 'uno-viejo'])
+  })
+
+  it('a lo más 12 (o las que se pidan); sin géneros no hay', () => {
+    const list = Array.from({ length: 20 }, (_, i) => m(`m${i}`, ['terror']))
+    expect(similarTitles(m('t', ['terror']), list)).toHaveLength(SIMILAR_MAX)
+    expect(SIMILAR_MAX).toBe(12)
+    expect(similarTitles(m('t', ['terror']), list, 3)).toHaveLength(3)
+    expect(similarTitles(m('t', []), list)).toEqual([])
   })
 })

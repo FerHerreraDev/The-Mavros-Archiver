@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { getCatalog, getWatchable } from '@/lib/data/catalog'
+import { getCatalog, getMovieDetail, getWatchable } from '@/lib/data/catalog'
 import { resetRequest } from '../helpers/request-context'
 import { adminClient, createUser, deleteUsers, sessionCookies, type TestUser } from '../helpers/users'
 
@@ -187,5 +187,61 @@ describe('CAT-07 destacadas de la portada', () => {
       backdrop: BACKDROP,
       accent: null,
     })
+  })
+})
+
+describe('CAT-09 / CAT-10 detalle de una película', () => {
+  const d: Record<string, string> = {}
+  const genreA = `detalle-a-${tag}`
+  const genreB = `detalle-b-${tag}`
+
+  beforeAll(async () => {
+    const movie = async (key: string, fields: Record<string, unknown>) => {
+      const slug = `det-${key}-${tag}`
+      const { data, error } = await adminClient()
+        .from('movies')
+        .insert({ slug, title: `Det ${key}`, duration_seconds: 6000, hls_path: `movies/${slug}/master.m3u8`, status: 'published', ...fields })
+        .select('id')
+        .single()
+      if (error) throw error
+      d[key] = data.id
+    }
+    await movie('main', { genres: [genreA, genreB], trailer_key: 'CTB15PPtMyA', cast: [{ name: 'Sam Neill', character: 'Mark', profile_url: null }] })
+    await movie('both', { genres: [genreA, genreB] })
+    await movie('one', { genres: [genreB] })
+    await movie('other', { genres: ['comedia'] })
+    await movie('hidden', { genres: [genreA], status: 'draft' })
+    const { data: show } = await adminClient().from('series').insert({ slug: `det-show-${tag}`, title: 'Det serie', status: 'published' }).select('id').single()
+    d.show = show!.id
+    await movie('episode', { genres: [genreA], series_id: show!.id, season_number: 1, episode_number: 1 })
+    await adminClient().from('watch_progress').insert({ user_id: viewer.id, movie_id: d.main, position_seconds: 1500 })
+  })
+
+  afterAll(async () => {
+    await adminClient().from('watch_progress').delete().eq('movie_id', d.main)
+    await adminClient().from('movies').delete().like('slug', `det-%-${tag}`)
+    await adminClient().from('series').delete().eq('id', d.show)
+  })
+
+  it('trae la película con tráiler y reparto, y el progreso del usuario', async () => {
+    await as(viewer)
+    const detail = await getMovieDetail(`det-main-${tag}`)
+    expect(detail?.movie).toMatchObject({ id: d.main, trailer_key: 'CTB15PPtMyA', cast: [{ name: 'Sam Neill', character: 'Mark', profile_url: null }] })
+    expect(detail?.positionSeconds).toBe(1500)
+  })
+
+  it('"Más como esta": solo publicadas que comparten género, la que comparte más primero; sin episodios ni ella misma', async () => {
+    await as(viewer)
+    const ids = (await getMovieDetail(`det-main-${tag}`))!.similar.map((m) => m.id)
+    expect(ids.indexOf(d.both)).toBe(0)
+    expect(ids).toContain(d.one)
+    for (const key of ['main', 'other', 'hidden', 'episode']) expect(ids).not.toContain(d[key])
+  })
+
+  it('borrador para un user, episodio o inexistente → null; el admin ve el borrador', async () => {
+    await as(viewer)
+    for (const key of ['hidden', 'episode', 'no-existe']) expect(await getMovieDetail(`det-${key}-${tag}`)).toBeNull()
+    await as(boss)
+    expect((await getMovieDetail(`det-hidden-${tag}`))?.movie.status).toBe('draft')
   })
 })
