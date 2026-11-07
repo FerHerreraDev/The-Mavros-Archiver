@@ -101,6 +101,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 | ID | Requisito |
 |---|---|
 | UTIL-01 | La URL del sitio para correos usa `NEXT_PUBLIC_SITE_URL` (sin `/` final) si existe; si no, el origin del request; si no, el host reenviado; si no, `http://localhost:3000`. |
+| UTIL-02 | En Vercel, sin `NEXT_PUBLIC_SITE_URL`, los links de correo usan el dominio de producción (`VERCEL_PROJECT_PRODUCTION_URL`), nunca la URL de deployment desde la que invitó el admin: esas URLs piden cuenta de Vercel. |
 
 ## Fase 2 — Perfil y panel de administración
 

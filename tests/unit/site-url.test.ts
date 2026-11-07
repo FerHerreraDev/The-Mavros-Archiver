@@ -9,6 +9,7 @@ describe('getSiteUrl (UTIL-01)', () => {
   beforeEach(() => {
     requestHeaders.current = new Headers()
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', '')
+    vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', '')
   })
   afterEach(() => vi.unstubAllEnvs())
 
@@ -20,6 +21,18 @@ describe('getSiteUrl (UTIL-01)', () => {
 
   it('quita la "/" final de NEXT_PUBLIC_SITE_URL', async () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://mavros.example/')
+    expect(await getSiteUrl()).toBe('https://mavros.example')
+  })
+
+  it('en Vercel usa el dominio de producción aunque se invite desde una URL de deployment (UTIL-02)', async () => {
+    vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', 'the-mavros-archiver.vercel.app')
+    requestHeaders.current.set('origin', 'https://the-mavros-archiver-abc123-fernando.vercel.app')
+    expect(await getSiteUrl()).toBe('https://the-mavros-archiver.vercel.app')
+  })
+
+  it('NEXT_PUBLIC_SITE_URL gana sobre el dominio de Vercel (UTIL-02)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://mavros.example')
+    vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', 'the-mavros-archiver.vercel.app')
     expect(await getSiteUrl()).toBe('https://mavros.example')
   })
 
