@@ -4,6 +4,7 @@ import {
   inviteUserAction,
   updateUserRoleAction,
   resendInviteAction,
+  inviteLinkAction,
   setUserActiveAction,
 } from '@/lib/actions/admin.actions'
 import { listUsersForAdmin } from '@/lib/data/admin-users'
@@ -109,7 +110,15 @@ describe('ADM-12 nadie sin rol admin puede usar las acciones ni ver la tabla', (
       expect(await listEmailsTo(pending.email)).toHaveLength(1)
     })
 
-    it(`${who}: invitar → error, sin usuario ni correo`, async () => {
+    it(`${who}: copiar link de invitación → error, sin link (ADM-14)`, async () => {
+      const pending = await pendingInvite()
+      await as(who === 'user' ? regular : null)
+      const result = await inviteLinkAction({ userId: pending.id })
+      expect(result.error).toBeTruthy()
+      expect(result.link).toBeUndefined()
+    })
+
+        it(`${who}: invitar → error, sin usuario ni correo`, async () => {
       await as(who === 'user' ? regular : null)
       const email = uniqueEmail('adm12')
       const result = await inviteUserAction(formData({ email }))
@@ -221,6 +230,58 @@ describe('ADM-08 reenviar invitación', () => {
   })
 })
 
+/** Abre un link generado por el panel contra /auth/confirm y devuelve a dónde terminó */
+async function openLink(link: string) {
+  resetRequest()
+  const { redirect } = await runAndCaptureRedirect(() => confirmGET(new NextRequest(link)))
+  return redirect
+}
+
+describe('ADM-14 copiar link de invitación', () => {
+  it('a un pendiente que no abrió el correo: link de invitación que lleva a /set-password, sin correo nuevo', async () => {
+    const pending = await pendingInvite()
+    await as(boss)
+    const result = await inviteLinkAction({ userId: pending.id })
+    expect(result.error).toBeUndefined()
+    expect(result.link).toContain('/auth/confirm?token_hash=')
+    expect(result.link).toContain('type=invite')
+    expect(await openLink(result.link!)).toBe('/set-password')
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(await listEmailsTo(pending.email)).toHaveLength(1)
+  })
+
+  it('a un pendiente que abrió el correo pero no eligió contraseña: link de recuperación que funciona', async () => {
+    const pending = await pendingInvite()
+    const [first] = await listEmailsTo(pending.email)
+    expect(await openEmailLink((await readEmail(first.ID)).HTML)).toBe('/set-password')
+
+    await as(boss)
+    const result = await inviteLinkAction({ userId: pending.id })
+    expect(result.link).toContain('type=recovery')
+    expect(await openLink(result.link!)).toBe('/set-password')
+  })
+
+  it('el link sirve una sola vez', async () => {
+    const pending = await pendingInvite()
+    await as(boss)
+    const { link } = await inviteLinkAction({ userId: pending.id })
+    expect(await openLink(link!)).toBe('/set-password')
+    expect(await openLink(link!)).toMatch(/^\/login\?error=link_invalid/)
+  })
+
+  it('a un usuario activo o desactivado → error, sin link', async () => {
+    const active = await newUser()
+    const disabled = await pendingInvite()
+    await adminClient().auth.admin.updateUserById(disabled.id, { ban_duration: '24h' })
+    await as(boss)
+    for (const userId of [active.id, disabled.id]) {
+      const result = await inviteLinkAction({ userId })
+      expect(result.error).toBeTruthy()
+      expect(result.link).toBeUndefined()
+    }
+  })
+})
+
 describe('ADM-09 / ADM-10 / ADM-11 desactivar y reactivar', () => {
   it('ADM-09 desactivado no puede hacer login y pierde la sesión que tenía abierta', async () => {
     const target = await newUser()
@@ -296,6 +357,7 @@ describe('ADM-13 validación de entrada', () => {
     await as(boss)
     expect((await updateUserRoleAction({ userId, role: 'admin' })).error).toBeTruthy()
     expect((await resendInviteAction({ userId })).error).toBeTruthy()
+    expect((await inviteLinkAction({ userId })).error).toBeTruthy()
     expect((await setUserActiveAction({ userId, active: false })).error).toBeTruthy()
   })
 
@@ -312,6 +374,7 @@ describe('ADM-13 validación de entrada', () => {
     const results = [
       await updateUserRoleAction({ userId: ghost, role: 'admin' }),
       await resendInviteAction({ userId: ghost }),
+      await inviteLinkAction({ userId: ghost }),
       await setUserActiveAction({ userId: ghost, active: false }),
     ]
     for (const r of results) {

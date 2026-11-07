@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { Spinner } from '@/components/ui/spinner'
-import { ShieldCheck, ShieldOff, MailPlus, Ban, RotateCcw } from 'lucide-react'
+import { ShieldCheck, ShieldOff, MailPlus, Ban, RotateCcw, Link2 } from 'lucide-react'
 import {
   updateUserRoleAction,
   resendInviteAction,
+  inviteLinkAction,
   setUserActiveAction,
   type AdminActionResult,
 } from '@/lib/actions/admin.actions'
@@ -55,11 +56,14 @@ function UserRow({ user }: { user: AdminUserRow }) {
   // Qué botón se tocó: solo ese muestra el indicador; todos quedan bloqueados (UX-01)
   const [running, setRunning] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<AdminActionResult | null>(null)
+  // Link de invitación generado (ADM-14): se muestra para copiarlo a mano si el portapapeles falla
+  const [link, setLink] = useState<string | null>(null)
 
   const run = (key: string, action: () => Promise<AdminActionResult>) => {
     setRunning(key)
     startTransition(async () => {
       setFeedback(null)
+      setLink(null)
       try {
         setFeedback(await action())
       } catch (err) {
@@ -82,6 +86,15 @@ function UserRow({ user }: { user: AdminUserRow }) {
         )}
         {feedback?.success && (
           <p className="text-xs text-emerald-400 mt-1" role="status">{feedback.success}</p>
+        )}
+        {link && (
+          <input
+            readOnly
+            value={link}
+            aria-label={`Link de invitación de ${user.email}`}
+            onFocus={(e) => e.currentTarget.select()}
+            className="mt-2 w-full max-w-md rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground"
+          />
         )}
       </td>
       <td className="px-3 py-3"><RoleBadge role={user.role} /></td>
@@ -115,6 +128,32 @@ function UserRow({ user }: { user: AdminUserRow }) {
               >
                 {busy('resend') ? <Spinner /> : <MailPlus className="h-3.5 w-3.5" />}
                 Reenviar
+              </button>
+            )}
+
+            {user.status === 'pending' && (
+              <button
+                type="button"
+                className={ACTION_BUTTON}
+                disabled={isPending}
+                aria-label={`Copiar link de invitación de ${user.email}`}
+                aria-busy={busy('link')}
+                onClick={() =>
+                  run('link', async () => {
+                    const result = await inviteLinkAction({ userId: user.id })
+                    if (!result.link) return result
+                    setLink(result.link)
+                    try {
+                      await navigator.clipboard.writeText(result.link)
+                      return { success: `${result.success} Ya está copiado: pégalo en WhatsApp.` }
+                    } catch {
+                      return { success: `${result.success} Cópialo de abajo.` }
+                    }
+                  })
+                }
+              >
+                {busy('link') ? <Spinner /> : <Link2 className="h-3.5 w-3.5" />}
+                Copiar link
               </button>
             )}
 

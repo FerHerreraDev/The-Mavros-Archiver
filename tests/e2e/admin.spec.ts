@@ -145,6 +145,30 @@ test('ADM-08 reenviar invitación a un pendiente: llega un segundo correo', asyn
   await waitForEmailCount(email, 2)
 })
 
+test('ADM-14 copiar link de invitación: lo copia y el invitado llega a elegir contraseña', async ({ page, browser }) => {
+  const email = uniqueEmail('e2e-link')
+  createdEmails.push(email)
+  const { error } = await adminClient().auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${E2E_BASE_URL}/auth/confirm?next=/set-password`,
+  })
+  if (error) throw error
+  await waitForEmailCount(email, 1)
+
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await loginAs(page, admin)
+  await page.goto('/dashboard/admin')
+  await row(page, email).getByRole('button', { name: `Copiar link de invitación de ${email}` }).click()
+  await expect(row(page, email).getByRole('status')).toContainText('copiado')
+  const link = await row(page, email).getByRole('textbox', { name: `Link de invitación de ${email}` }).inputValue()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link)
+
+  const invitee = await (await browser.newContext()).newPage()
+  await invitee.goto(link)
+  await expect(invitee).toHaveURL(/\/set-password$/)
+  await expect(invitee.getByText(email)).toBeVisible()
+  await invitee.context().close()
+})
+
 test('ADM-08 un usuario activo no tiene botón de reenviar', async ({ page }) => {
   await loginAs(page, admin)
   await page.goto('/dashboard/admin')

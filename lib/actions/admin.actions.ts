@@ -167,6 +167,44 @@ export async function resendInviteAction(input: { userId: string }): Promise<Adm
   return { success: `Invitación reenviada a ${user.email}.` }
 }
 
+export type InviteLinkResult = AdminActionResult & { link?: string }
+
+/**
+ * Link de invitación para mandar por otro medio (WhatsApp, etc.) sin pasar por el correo de
+ * Supabase, que tiene límite por hora (ADM-14). Mismas reglas que reenviar: solo a pendientes.
+ * - Si nunca abrió el link: link de invitación
+ * - Si lo abrió pero no eligió contraseña: link de recuperación
+ * Ambos caen en /auth/confirm → /set-password. Generar uno nuevo invalida el del correo anterior.
+ * El link es una credencial: solo se devuelve al admin y nunca se registra en logs.
+ */
+export async function inviteLinkAction(input: { userId: string }): Promise<InviteLinkResult> {
+  const session = await requireAdmin()
+  if (!session) return { error: DENIED }
+
+  const parsed = z.object({ userId: UserIdSchema }).safeParse(input)
+  if (!parsed.success) return { error: 'Datos inválidos.' }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin.auth.admin.getUserById(parsed.data.userId)
+  if (error || !data.user?.email) return { error: 'Usuario no encontrado.' }
+
+  const user = data.user
+  if (userStatus(user) !== 'pending') {
+    return { error: 'Solo se puede generar el link para usuarios pendientes.' }
+  }
+
+  const type = user.email_confirmed_at ? 'recovery' : 'invite'
+  const { data: generated, error: linkError } = await admin.auth.admin.generateLink({ type, email: user.email! })
+  const tokenHash = generated?.properties?.hashed_token
+  if (linkError || !tokenHash) {
+    console.error('[ADMIN] Error generando link de invitación:', linkError?.code, linkError?.message)
+    return { error: 'No se pudo generar el link.' }
+  }
+
+  const link = `${await getSiteUrl()}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=${type}&next=/set-password`
+  return { success: `Link para ${user.email} listo. Sirve una sola vez y caduca pronto.`, link }
+}
+
 /**
  * Desactiva (ban) o reactiva a otro usuario
  */

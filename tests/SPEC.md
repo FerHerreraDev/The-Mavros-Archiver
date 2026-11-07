@@ -145,6 +145,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 |---|---|
 | ADM-12 | Toda acción de admin (invitar, cambiar rol, reenviar, desactivar/reactivar) y la carga de la tabla rechazan a visitantes sin sesión y a usuarios con rol `user`, sin cambiar nada. |
 | ADM-13 | Las acciones validan su entrada: un `userId` que no es UUID, o un rol fuera de `admin`/`user`, se rechaza sin cambiar nada. Un UUID que no existe da error. |
+| ADM-14 | Un admin puede generar y copiar el link de invitación de un usuario pendiente, para mandarlo sin correo (no cuenta para el límite de correos de Supabase). El link lleva a `/set-password` (invitación si nunca abrió el link, recuperación si ya lo abrió). A un usuario activo o desactivado, o sin rol admin, da error y no genera link. |
 
 ### Interfaz
 
