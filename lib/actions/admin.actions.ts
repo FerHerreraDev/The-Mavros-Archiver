@@ -10,6 +10,7 @@ import { clientIp } from '@/lib/client-ip'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { getSiteUrl } from '@/lib/site-url'
+import { inviteErrorMessage } from '@/lib/auth/invite-errors'
 
 const TIMEOUT_MS = 10000 // 10 segundos
 const ADMIN_PATH = '/dashboard/admin'
@@ -74,11 +75,8 @@ export async function inviteUserAction(formData: FormData): Promise<AdminActionR
     )
 
     if (inviteError) {
-      console.error('[ADMIN] Error invitando usuario:', inviteError.message)
-      if (inviteError.code === 'email_exists') {
-        return { error: 'Este correo ya pertenece a un usuario registrado.' }
-      }
-      return { error: 'Hubo un problema al enviar la invitación.' }
+      console.error('[ADMIN] Error invitando usuario:', inviteError.code, inviteError.message)
+      return { error: inviteErrorMessage(inviteError, 'Hubo un problema al enviar la invitación.') }
     }
 
     revalidatePath(ADMIN_PATH)
@@ -162,8 +160,8 @@ export async function resendInviteAction(input: { userId: string }): Promise<Adm
     : await admin.auth.admin.inviteUserByEmail(user.email!, { redirectTo })
 
   if (sendError) {
-    console.error('[ADMIN] Error reenviando invitación:', sendError.message)
-    return { error: 'No se pudo reenviar la invitación.' }
+    console.error('[ADMIN] Error reenviando invitación:', sendError.code, sendError.message)
+    return { error: inviteErrorMessage(sendError, 'No se pudo reenviar la invitación.') }
   }
 
   return { success: `Invitación reenviada a ${user.email}.` }
@@ -200,6 +198,8 @@ export async function setUserActiveAction(input: { userId: string; active: boole
     const { error: revokeError } = await admin.rpc('revoke_user_sessions', { target_user_id: userId })
     if (revokeError) {
       console.error('[ADMIN] Error cerrando sesiones:', revokeError.message)
+      // El ban sí quedó: la tabla tiene que mostrarlo aunque falte cerrar sesiones
+      revalidatePath(ADMIN_PATH)
       return { error: 'Usuario desactivado, pero no se pudieron cerrar sus sesiones. Intenta de nuevo.' }
     }
   }

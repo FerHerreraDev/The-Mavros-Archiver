@@ -77,6 +77,7 @@ Las pruebas nunca tocan el proyecto de Supabase de producción: los helpers abor
 | INV-04 | Flujo completo: el invitado recibe el correo, abre el link, llega a `/set-password` mostrando su email, elige contraseña, entra a `/dashboard`, y más tarde puede hacer login con esa contraseña. |
 | INV-05 | Un link de invitación ya usado o inválido lleva a `/login` con un mensaje de link inválido/expirado. |
 | INV-06 | El link del correo apunta a `<site>/auth/confirm?token_hash=…&type=invite`. |
+| INV-07 | Si Supabase no manda el correo por su límite por hora, invitar y reenviar dicen que se alcanzó el límite y que se intente más tarde; un correo ya registrado sugiere usar "Reenviar". |
 
 ### Confirmación de links (`/auth/confirm`)
 
