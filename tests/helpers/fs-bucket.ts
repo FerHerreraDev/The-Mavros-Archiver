@@ -1,12 +1,32 @@
 // Bucket R2 falso respaldado por una carpeta local (misma forma que la API de R2 que usa el Worker)
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir, rm } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { VideoBucket, BucketRange } from '../../workers/video/src/handler.ts'
 
-export function fsBucket(root: string, reads: string[] = []): VideoBucket {
+// Solo con `writable` se pueden borrar archivos (PLY-10): así nadie borra los fixtures por accidente.
+export function fsBucket(root: string, reads: string[] = [], { writable = false } = {}): VideoBucket {
   const base = path.resolve(root)
+  const inside = (key: string) => {
+    const file = path.resolve(base, key)
+    return file.startsWith(base + path.sep) ? file : null
+  }
   return {
+    async list({ prefix, limit = 1000 }) {
+      const all = (await readdir(base, { recursive: true, withFileTypes: true }))
+        .filter((d) => d.isFile())
+        .map((d) => path.relative(base, path.join(d.parentPath, d.name)).split(path.sep).join('/'))
+        .filter((key) => key.startsWith(prefix))
+        .sort()
+      return { objects: all.slice(0, limit).map((key) => ({ key })), truncated: all.length > limit }
+    },
+    async delete(keys: string[]) {
+      if (!writable) throw new Error('fsBucket de solo lectura')
+      for (const key of keys) {
+        const file = inside(key)
+        if (file) await rm(file, { force: true })
+      }
+    },
     async get(key: string, options?: { range?: BucketRange }) {
       reads.push(key)
       const file = path.resolve(base, key)

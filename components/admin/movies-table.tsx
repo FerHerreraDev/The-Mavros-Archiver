@@ -52,6 +52,7 @@ function MovieRow({ movie }: { movie: AdminMovie }) {
       published={published}
       onToggleStatus={() => setMovieStatusAction({ id: movie.id, status: published ? 'draft' : 'published' })}
       onDelete={() => deleteMovieAction({ id: movie.id })}
+      onDeleteWithFiles={() => deleteMovieAction({ id: movie.id, deleteFiles: true })}
       cells={(feedback) => (
         <>
           <td className="px-6 py-3">

@@ -198,10 +198,11 @@ Pensado para varios clientes (web y la futura app Android en Kotlin): las reglas
 | MOV-08 | Antes de guardar, el servidor comprueba que el `master.m3u8` existe en `VIDEO_BASE_URL + hls_path` y es un master HLS válido; si no, error claro y no se guarda. La duración se toma de la playlist (no se escribe a mano). |
 | MOV-09 | Si no se escribe slug, se genera del título (`"Chainsaw Man: Reze Arc"` → `chainsaw-man-reze-arc`). Un slug repetido da error claro. |
 | MOV-10 | Los géneros se escriben separados por comas y se guardan normalizados: minúsculas, sin espacios sobrantes, sin repetidos. |
-| MOV-11 | Un admin puede editar, publicar, despublicar y borrar. Borrar pide confirmación y no toca los archivos en R2. |
+| MOV-11 | Un admin puede editar, publicar, despublicar y borrar. Borrar pide confirmación y no toca los archivos en R2 (salvo que se marque la opción de MOV-15). |
 | MOV-12 | Un `user` que entra a `/dashboard/admin/movies` vuelve a `/dashboard`; todas las acciones de películas rechazan a anónimos y `user` sin cambiar nada. |
 | MOV-13 | El panel admin tiene pestañas **Usuarios** / **Películas**. |
 | MOV-14 | Al tocar **Editar**, **Nueva película** o **Cancelar** del formulario, el botón muestra **de inmediato** que está cargando (indicador girando, anunciado como "Cargando…") hasta que abre el formulario, aunque el servidor tarde. |
+| MOV-15 | **Borrar también el video.** Al confirmar el borrado de una película o episodio hay una casilla, **apagada cada vez**, "También borrar los archivos del video en R2". Marcada, el botón dice "… y su video" y se borran primero **todos** los archivos de su carpeta en R2 (PLY-10) y después la fila; el mensaje dice cuántos archivos se borraron. Si el borrado en R2 falla, la película sigue en la tabla (se puede reintentar). No borra nada si otra película usa la misma carpeta o si el video no está en una carpeta propia de al menos dos niveles (`movies/<slug>/`). Solo un admin. |
 
 ## Fase 4 — Acceso protegido al video
 
@@ -221,6 +222,7 @@ El video deja de ser público. Un Worker de Cloudflare delante de R2 solo entreg
 | PLY-03 | Sin token, con token inválido, caducado o de otra película → 403 y no se lee nada de R2. |
 | PLY-04 | Con token válido entrega `.m3u8`, `.ts` y `.vtt` con su tipo correcto, CORS y soporte de `Range` (206). Archivo inexistente → 404. Cualquier otro tipo de archivo o ruta con `..` → 403/404, nunca se sirve. |
 | PLY-05 | Las rutas relativas de las playlists siguen funcionando: el token va en la ruta (`/t/<token>/…`), así que cada segmento lo hereda sin reescribir playlists. |
+| PLY-10 | `POST /purge/<token>` borra en R2 todos los archivos de la carpeta del token. El token de borrado es distinto al de reproducción (versión `p1`, firmada): uno nunca sirve para lo otro. Dura 2 min y solo lo firma el servidor de la app. Carpetas de un solo nivel (`movies/`) → 403. Sin token válido → 403 sin borrar nada; otro método → 405. Borra por tandas (5 000 por llamada) y responde `{deleted, done}`; el servidor repite hasta `done: true`. Nunca borra otra carpeta que empiece igual (`peli/` no toca `peli-2/`). |
 
 ### Endpoint `GET /api/playback/<movieId>`
 

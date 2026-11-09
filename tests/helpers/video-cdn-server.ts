@@ -10,8 +10,8 @@ import { TEST_VIDEO_SECRET } from './test-secrets.ts'
 
 export { TEST_VIDEO_SECRET }
 
-export function startVideoCdn(root: string, secret: string, port = 0, reads: string[] = []): Promise<Server> {
-  const env = { VIDEOS: fsBucket(root, reads), VIDEO_TOKEN_SECRET: secret }
+export function startVideoCdn(root: string, secret: string, port = 0, reads: string[] = [], { writable = false } = {}): Promise<Server> {
+  const env = { VIDEOS: fsBucket(root, reads, { writable }), VIDEO_TOKEN_SECRET: secret }
   const server = createServer(async (req, res) => {
     const headers = new Headers()
     for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v)

@@ -33,17 +33,21 @@ type Props = {
   onDelete: () => Promise<MovieActionResult>
   /** Texto extra del botón de confirmar borrado (ej. "y sus 8 episodios") */
   deleteDetail?: string
+  /** Si existe, la confirmación ofrece borrar también los archivos del video en R2 (MOV-15) */
+  onDeleteWithFiles?: () => Promise<MovieActionResult>
   /** Celdas de datos de la fila; recibe el mensaje de resultado para mostrarlo junto al título */
   cells: (feedback: ReactNode) => ReactNode
 }
 
 /** Fila de tabla del panel con Estado + Editar / Publicar / Borrar (MOV-11, SER-05, UX-01) */
-export function RowActions({ title, editHref, published, onToggleStatus, onDelete, deleteDetail, cells }: Props) {
+export function RowActions({ title, editHref, published, onToggleStatus, onDelete, deleteDetail, onDeleteWithFiles, cells }: Props) {
   const [isPending, startTransition] = useTransition()
   // Qué botón se tocó: solo ese muestra el indicador; todos quedan bloqueados (UX-01)
   const [running, setRunning] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<MovieActionResult | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // Apagada cada vez que se abre la confirmación: borrar el video nunca es lo que pasa sin querer
+  const [withFiles, setWithFiles] = useState(false)
 
   const run = (key: string, action: () => Promise<MovieActionResult>) => {
     setRunning(key)
@@ -104,16 +108,36 @@ export function RowActions({ title, editHref, published, onToggleStatus, onDelet
                 type="button"
                 className={`${ACTION_BUTTON} border-destructive/50 text-destructive`}
                 disabled={isPending}
-                aria-label={`Confirmar borrar ${title}`}
+                aria-label={withFiles ? `Confirmar borrar ${title} y sus archivos de video` : `Confirmar borrar ${title}`}
                 aria-busy={busy('delete')}
-                onClick={() => run('delete', onDelete)}
+                onClick={() => run('delete', withFiles && onDeleteWithFiles ? onDeleteWithFiles : onDelete)}
               >
                 {busy('delete') ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
-                ¿Seguro? Borrar{deleteDetail ? ` ${deleteDetail}` : ''}
+                ¿Seguro? Borrar{deleteDetail ? ` ${deleteDetail}` : ''}{withFiles ? ' y su video' : ''}
               </button>
-              <button type="button" className={ACTION_BUTTON} disabled={isPending} onClick={() => setConfirmingDelete(false)}>
+              <button
+                type="button"
+                className={ACTION_BUTTON}
+                disabled={isPending}
+                onClick={() => {
+                  setConfirmingDelete(false)
+                  setWithFiles(false)
+                }}
+              >
                 Cancelar
               </button>
+              {onDeleteWithFiles && (
+                <label className="basis-full flex items-center justify-end gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-destructive"
+                    checked={withFiles}
+                    disabled={isPending}
+                    onChange={(e) => setWithFiles(e.target.checked)}
+                  />
+                  También borrar los archivos del video en R2 (libera espacio, no se puede deshacer)
+                </label>
+              )}
             </>
           ) : (
             <button
@@ -121,7 +145,10 @@ export function RowActions({ title, editHref, published, onToggleStatus, onDelet
               className={`${ACTION_BUTTON} hover:border-destructive/50 hover:text-destructive`}
               disabled={isPending}
               aria-label={`Borrar ${title}`}
-              onClick={() => setConfirmingDelete(true)}
+              onClick={() => {
+                setWithFiles(false)
+                setConfirmingDelete(true)
+              }}
             >
               <Trash2 className="h-3.5 w-3.5" />
               Borrar

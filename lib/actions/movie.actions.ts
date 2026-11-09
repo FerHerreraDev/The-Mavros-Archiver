@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/guards'
 import { episodeSlug, movieFormSchema } from '@/lib/movies'
 import { probeHlsMaster } from '@/lib/hls/remote'
-import { signedVideoBase } from '@/lib/video/playback'
+import { purgeVideoFolder, signedVideoBase } from '@/lib/video/playback'
+import { isPurgeablePrefix, moviePrefix } from '@/workers/video/src/token'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { processPoster, uploadPoster } from '@/lib/poster/thumbhash'
 
@@ -133,11 +134,43 @@ export async function setMovieStatusAction(input: { id: string; status: string }
   return { success: `"${data[0].title}" ${parsed.data.status === 'published' ? 'publicada' : 'pasó a borrador'}.` }
 }
 
-/** Borra la fila. Los archivos en R2 no se tocan (MOV-11). */
-export async function deleteMovieAction(input: { id: string }): Promise<MovieActionResult> {
+/**
+ * Borra la fila. Por defecto los archivos en R2 no se tocan (MOV-11).
+ * Con `deleteFiles` borra antes la carpeta del video en R2 (MOV-15): primero los archivos y luego la
+ * fila, así si algo falla la película sigue en la tabla y se puede reintentar.
+ */
+export async function deleteMovieAction(input: { id: string; deleteFiles?: boolean }): Promise<MovieActionResult> {
   const session = await requireAdmin()
   if (!session) return { error: DENIED }
   if (!IdSchema.safeParse(input.id).success) return { error: 'Datos inválidos.' }
+
+  let filesDeleted: number | null = null
+  if (input.deleteFiles === true) {
+    const { data: movie, error } = await session.supabase.from('movies').select('id, hls_path').eq('id', input.id).maybeSingle()
+    if (error) return dbError(error)
+    if (!movie) return { error: 'Película no encontrada.' }
+
+    // Si otra película o episodio usa la misma carpeta, borrarla lo rompería
+    let prefix = ''
+    try {
+      prefix = moviePrefix(movie.hls_path)
+    } catch {}
+    if (!isPurgeablePrefix(prefix)) {
+      return { error: 'El video no está en una carpeta propia (ej. movies/<slug>/); no se borró nada.' }
+    }
+    const { data: others, error: othersError } = await session.supabase.from('movies').select('hls_path').neq('id', input.id)
+    if (othersError) return dbError(othersError)
+    if (others?.some((o) => o.hls_path.startsWith(prefix))) {
+      return { error: `Otra película usa la carpeta ${prefix}; no se borró nada.` }
+    }
+
+    try {
+      filesDeleted = await purgeVideoFolder(movie.hls_path)
+    } catch (err) {
+      console.error('Video purge error:', err)
+      return { error: 'No se pudieron borrar los archivos del video. La película sigue; intenta de nuevo.' }
+    }
+  }
 
   const { data, error } = await session.supabase.from('movies').delete().eq('id', input.id).select('title')
   if (error) return dbError(error)
@@ -145,5 +178,8 @@ export async function deleteMovieAction(input: { id: string }): Promise<MovieAct
 
   revalidatePath(MOVIES_PATH)
   revalidatePath(SERIES_PATH, 'layout')
+  if (filesDeleted !== null) {
+    return { success: `"${data[0].title}" borrada junto con sus ${filesDeleted.toLocaleString('es-MX')} archivos de video.` }
+  }
   return { success: `"${data[0].title}" borrada.` }
 }

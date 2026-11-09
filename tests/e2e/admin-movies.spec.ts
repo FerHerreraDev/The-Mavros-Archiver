@@ -109,6 +109,12 @@ test('MOV-11 editar, publicar, despublicar y borrar con confirmación', async ({
   // Borrar pide confirmación: el primer clic no borra
   await row(page, edited).getByRole('button', { name: `Borrar ${edited}` }).click()
   await expect(row(page, edited)).toBeVisible()
+  // MOV-15: borrar también el video es opcional y arranca apagado
+  const withFiles = row(page, edited).getByRole('checkbox', { name: /También borrar los archivos del video/ })
+  await expect(withFiles).not.toBeChecked()
+  await withFiles.check()
+  await expect(row(page, edited).getByRole('button', { name: `Confirmar borrar ${edited} y sus archivos de video` })).toContainText('y su video')
+  await withFiles.uncheck()
   await row(page, edited).getByRole('button', { name: `Confirmar borrar ${edited}` }).click()
   await expect(row(page, edited)).toHaveCount(0)
 })

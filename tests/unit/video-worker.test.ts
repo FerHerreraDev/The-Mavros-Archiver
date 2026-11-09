@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import path from 'node:path'
 import { readFileSync } from 'node:fs'
 import { handleRequest } from '@/workers/video/src/handler'
-import { signPlaybackToken } from '@/workers/video/src/token'
+import { signPlaybackToken, signPurgeToken } from '@/workers/video/src/token'
 import { fsBucket } from '../helpers/fs-bucket'
 
 // Carpeta que simula el bucket: <fixtures>/hls con dos "películas"
@@ -116,5 +116,71 @@ describe('PLY-05 las URIs relativas de las playlists heredan el token', () => {
     const res = await get(variantUrl)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('#EXT-X-ENDLIST')
+  })
+})
+
+describe('PLY-10 borrar la carpeta de una película', () => {
+  // Bucket en memoria: aquí sí se borra de verdad
+  function memoryBucket(keys: string[]) {
+    const store = new Set(keys)
+    const bucket = {
+      ...env.VIDEOS,
+      async list({ prefix, limit = 1000 }: { prefix: string; limit?: number }) {
+        const all = [...store].filter((k) => k.startsWith(prefix)).sort()
+        return { objects: all.slice(0, limit).map((key) => ({ key })), truncated: all.length > limit }
+      },
+      async delete(toDelete: string[]) {
+        toDelete.forEach((k) => store.delete(k))
+      },
+    }
+    return { store, bucket }
+  }
+
+  const purgeToken = (prefix = 'movies/peli/', expiresAt = NOW + 120, secret = SECRET) =>
+    signPurgeToken({ prefix, expiresAt, secret })
+  const purge = (path: string, method = 'POST') => handleRequest(new Request(`${CDN}${path}`, { method }), env, NOW)
+
+  it('borra todo lo de esa carpeta y nada de otras (ni de "peli-2/")', async () => {
+    const { store, bucket } = memoryBucket([
+      'movies/peli/master.m3u8', 'movies/peli/720p/seg_00000.ts', 'movies/peli/sub-0/index.vtt',
+      'movies/peli-2/master.m3u8', 'movies/otra/master.m3u8',
+    ])
+    env.VIDEOS = bucket
+    const res = await purge(`/purge/${await purgeToken()}`)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ deleted: 3, done: true })
+    expect([...store].sort()).toEqual(['movies/otra/master.m3u8', 'movies/peli-2/master.m3u8'])
+  })
+
+  it('carpetas grandes se borran por tandas: done: false hasta terminar', async () => {
+    const { store, bucket } = memoryBucket(Array.from({ length: 5500 }, (_, i) => `movies/peli/720p/seg_${String(i).padStart(5, '0')}.ts`))
+    env.VIDEOS = bucket
+    const first = await (await purge(`/purge/${await purgeToken()}`)).json()
+    expect(first).toEqual({ deleted: 5000, done: false })
+    const second = await (await purge(`/purge/${await purgeToken()}`)).json()
+    expect(second).toEqual({ deleted: 500, done: true })
+    expect(store.size).toBe(0)
+  })
+
+  it.each([
+    ['token de reproducción', async () => `/purge/${await token('movies/peli/')}`],
+    ['token de borrado caducado', async () => `/purge/${await purgeToken('movies/peli/', NOW - 1)}`],
+    ['token de borrado de otro secreto', async () => `/purge/${await purgeToken('movies/peli/', NOW + 60, 'otro-secreto-0123456789abcdefghijklm')}`],
+    ['carpeta de un solo nivel ("movies/")', async () => `/purge/${await purgeToken('movies/')}`],
+    ['token basura', async () => '/purge/basura'],
+  ])('%s → 403 y no borra nada', async (_label, path) => {
+    const { store, bucket } = memoryBucket(['movies/peli/master.m3u8', 'movies/otra/master.m3u8'])
+    env.VIDEOS = bucket
+    expect((await purge(await path())).status).toBe(403)
+    expect(store.size).toBe(2)
+  })
+
+  it('con GET → 405; y un token de borrado no sirve para reproducir', async () => {
+    const { store, bucket } = memoryBucket(['movies/peli/master.m3u8'])
+    env.VIDEOS = bucket
+    const t = await purgeToken()
+    expect((await purge(`/purge/${t}`, 'GET')).status).toBe(405)
+    expect((await purge(`/t/${t}/movies/peli/master.m3u8`, 'GET')).status).toBe(403)
+    expect(store.size).toBe(1)
   })
 })

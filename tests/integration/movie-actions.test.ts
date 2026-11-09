@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import path from 'node:path'
+import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import type { Server } from 'node:http'
 import {
   createMovieAction,
@@ -205,4 +207,95 @@ describe('MOV-12 anónimos y users no pueden', () => {
       expect(await bySlug(slug)).toMatchObject({ title: target.title, status: 'draft' })
     })
   }
+})
+
+describe('MOV-15 borrar también los archivos del video en R2', () => {
+  // "R2" en una carpeta temporal (copia de los fixtures) donde el Worker sí puede borrar
+  let root: string
+  let writable: Server
+
+  beforeAll(async () => {
+    root = mkdtempSync(path.join(tmpdir(), 'mavros-mov15-'))
+    writable = await startVideoCdn(root, TEST_VIDEO_SECRET, 0, [], { writable: true })
+    vi.stubEnv('VIDEO_CDN_URL', `http://127.0.0.1:${(writable.address() as { port: number }).port}`)
+  })
+
+  afterAll(() => {
+    writable.close()
+    rmSync(root, { recursive: true, force: true })
+    vi.stubEnv('VIDEO_CDN_URL', `http://127.0.0.1:${(server.address() as { port: number }).port}`)
+  })
+
+  const ladder = path.join(__dirname, '../fixtures/hls/ladder')
+  async function movieIn(folder: string) {
+    cpSync(ladder, path.join(root, folder), { recursive: true })
+    const slug = `it-${uniq()}`
+    const { data, error } = await adminClient()
+      .from('movies')
+      .insert({ slug, title: 'Película IT', duration_seconds: 10, hls_path: `${folder}/master.m3u8` })
+      .select('id')
+      .single()
+    if (error) throw error
+    return { id: data.id as string, slug }
+  }
+
+  it('borra la fila y toda la carpeta; las demás carpetas quedan', async () => {
+    const target = await movieIn('movies/it-borrar')
+    await movieIn('movies/it-borrar-2')
+    await as(boss)
+    const result = await deleteMovieAction({ id: target.id, deleteFiles: true })
+    expect(result.success).toMatch(/borrada junto con sus \d+ archivos de video/)
+    expect(await bySlug(target.slug)).toBeNull()
+    expect(existsSync(path.join(root, 'movies/it-borrar/master.m3u8'))).toBe(false)
+    expect(existsSync(path.join(root, 'movies/it-borrar-2/master.m3u8'))).toBe(true)
+  })
+
+  it('sin deleteFiles los archivos quedan (MOV-11)', async () => {
+    const target = await movieIn('movies/it-conservar')
+    await as(boss)
+    expect((await deleteMovieAction({ id: target.id })).success).toBeTruthy()
+    expect(existsSync(path.join(root, 'movies/it-conservar/master.m3u8'))).toBe(true)
+  })
+
+  it('si otra película usa la misma carpeta → error y no borra nada', async () => {
+    const a = await movieIn('movies/it-compartida')
+    const { data: b } = await adminClient()
+      .from('movies')
+      .insert({ slug: `it-${uniq()}`, title: 'Copia', duration_seconds: 10, hls_path: 'movies/it-compartida/master.m3u8' })
+      .select('id')
+      .single()
+    await as(boss)
+    const result = await deleteMovieAction({ id: a.id, deleteFiles: true })
+    expect(result.error).toMatch(/Otra película usa la carpeta/)
+    expect(await bySlug(a.slug)).not.toBeNull()
+    expect(existsSync(path.join(root, 'movies/it-compartida/master.m3u8'))).toBe(true)
+    await adminClient().from('movies').delete().eq('id', b!.id)
+  })
+
+  it('carpeta de un solo nivel ("ladder/") → error y no borra nada', async () => {
+    const target = await movieIn('ladder')
+    await as(boss)
+    const result = await deleteMovieAction({ id: target.id, deleteFiles: true })
+    expect(result.error).toMatch(/no está en una carpeta propia/)
+    expect(await bySlug(target.slug)).not.toBeNull()
+    expect(existsSync(path.join(root, 'ladder/master.m3u8'))).toBe(true)
+  })
+
+  it('si el Worker no puede borrar → error y la película sigue', async () => {
+    const target = await movieIn('movies/it-sin-worker')
+    vi.stubEnv('VIDEO_TOKEN_SECRET', 'otro-secreto-que-el-worker-no-conoce-123')
+    await as(boss)
+    const result = await deleteMovieAction({ id: target.id, deleteFiles: true })
+    vi.stubEnv('VIDEO_TOKEN_SECRET', TEST_VIDEO_SECRET)
+    expect(result.error).toMatch(/No se pudieron borrar los archivos/)
+    expect(await bySlug(target.slug)).not.toBeNull()
+    expect(existsSync(path.join(root, 'movies/it-sin-worker/master.m3u8'))).toBe(true)
+  })
+
+  it('un user no puede borrar archivos', async () => {
+    const target = await movieIn('movies/it-ajena')
+    await as(viewer)
+    expect((await deleteMovieAction({ id: target.id, deleteFiles: true })).error).toBeTruthy()
+    expect(existsSync(path.join(root, 'movies/it-ajena/master.m3u8'))).toBe(true)
+  })
 })
