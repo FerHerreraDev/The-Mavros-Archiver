@@ -110,13 +110,22 @@ class SupabaseAuthRepository(
 
     override suspend fun signInWithTokens(tokens: DeviceTokens): Boolean = try {
         val expiresAt = kotlin.time.Instant.fromEpochSeconds(tokens.expiresAtEpochSeconds)
+        // El usuario va dentro de la sesión importada: sin él, `session` emitiría por un instante
+        // SignedIn con id vacío. Si el token ya no sirve, validateSession() lo renueva abajo.
+        val user = try {
+            client.auth.retrieveUser(tokens.accessToken)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            null
+        }
         client.auth.importSession(
             UserSession(
                 accessToken = tokens.accessToken,
                 refreshToken = tokens.refreshToken,
                 expiresIn = (tokens.expiresAtEpochSeconds - System.currentTimeMillis() / 1000).coerceAtLeast(0),
                 tokenType = "bearer",
-                user = null,
+                user = user,
                 expiresAt = expiresAt,
             ),
         )
