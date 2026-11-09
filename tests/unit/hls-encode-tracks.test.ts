@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { parseRenditions } from '@/lib/hls/tracks.mjs'
 
-// VID-11 / VID-12 con un video REAL: dos audios (español, inglés), subtítulos en español con
-// un anuncio y una pista de subtítulos casi vacía. Se codifica con scripts/encode-hls.sh.
+// VID-11 / VID-12 / VID-13 con un video REAL: dos audios (español en AC-3, inglés en AAC), subtítulos
+// en español con un anuncio y una pista de subtítulos casi vacía. Se codifica con scripts/encode-hls.sh.
 const ROOT = path.resolve(__dirname, '../..')
 let dir: string
 let out: string
@@ -31,7 +31,7 @@ beforeAll(() => {
     '-f', 'lavfi', '-i', 'sine=frequency=660:sample_rate=48000',
     '-i', full, '-i', junk,
     '-map', '0', '-map', '1', '-map', '2', '-map', '3', '-map', '4',
-    '-t', '12', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', '-c:s', 'srt',
+    '-t', '12', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a:0', 'ac3', '-ac:a:0', '6', '-c:a:1', 'aac', '-c:s', 'srt',
     '-metadata:s:a:0', 'language=spa', '-metadata:s:a:1', 'language=eng',
     '-metadata:s:s:0', 'language=spa', '-metadata:s:s:1', 'language=spa',
     source,
@@ -40,6 +40,10 @@ beforeAll(() => {
 }, 300_000)
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+const audioOf = (file: string) =>
+  execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name,channels', '-of', 'csv=p=0', file]).toString().trim().split('\n')[0]
+const masterCodecs = (master: string) => [...readFileSync(master, 'utf8').matchAll(/CODECS="([^"]+)"/g)].flatMap((m) => m[1].split(','))
 
 describe('VID-11 / VID-12 al codificar', () => {
   it('dos idiomas de audio como pistas aparte y una de subtítulos apagada', () => {
@@ -61,6 +65,14 @@ describe('VID-11 / VID-12 al codificar', () => {
     expect(existsSync(path.join(out, 'audio-1', 'seg_00000.ts'))).toBe(true)
   })
 
+  it('VID-13 el audio AC-3 sale como AAC estéreo y el AAC se copia; el master solo cita H.264 y AAC', () => {
+    expect(audioOf(path.join(out, 'audio-0', 'seg_00000.ts'))).toBe('aac,2')
+    expect(audioOf(path.join(out, 'audio-1', 'seg_00000.ts'))).toBe('aac,1')
+    const codecs = masterCodecs(path.join(out, 'master.m3u8'))
+    expect(codecs.length).toBeGreaterThan(0)
+    expect(codecs.every((c) => /^(avc1|mp4a)\./.test(c))).toBe(true)
+  })
+
   it('el .vtt no trae el anuncio y está alineado con el video', () => {
     const vtt = readFileSync(path.join(out, 'sub-0', 'index.vtt'), 'utf8')
     expect(vtt).toMatch(/^WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:\d+,LOCAL:00:00:00\.000\n/)
@@ -73,5 +85,30 @@ describe('VID-11 / VID-12 al codificar', () => {
     const res = execFileSync('node', [path.join(ROOT, 'scripts/hls-verify.mjs'), out, '--source', source]).toString()
     expect(res).toContain('✓ Cumple VID-01..VID-06, VID-11 y VID-12')
     expect(res).toContain('Audio: Español, Inglés')
+  })
+})
+
+describe('VID-13 con una sola pista de audio en E-AC-3', () => {
+  let single: string
+  let singleOut: string
+
+  beforeAll(() => {
+    single = mkdtempSync(path.join(tmpdir(), 'mavros-vid13-'))
+    singleOut = path.join(single, 'out')
+    const src = path.join(single, 'source.mp4')
+    execFileSync('ffmpeg', [
+      '-hide_banner', '-nostdin', '-y', '-v', 'error',
+      '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=24',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+      '-t', '8', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'eac3', '-ac', '6', src,
+    ])
+    execFileSync(path.join(ROOT, 'scripts/encode-hls.sh'), [src, singleOut], { env: { ...process.env, PRESET: 'ultrafast' }, stdio: 'ignore' })
+  }, 300_000)
+
+  afterAll(() => rmSync(single, { recursive: true, force: true }))
+
+  it('cada calidad lleva el audio en AAC estéreo y el master solo cita H.264 y AAC', () => {
+    for (const q of ['720p', '480p', '360p']) expect(audioOf(path.join(singleOut, q, 'seg_00000.ts'))).toBe('aac,2')
+    expect(masterCodecs(path.join(singleOut, 'master.m3u8')).every((c) => /^(avc1|mp4a)\./.test(c))).toBe(true)
   })
 })

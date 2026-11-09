@@ -6,8 +6,9 @@
 # - Calidades: la original + 1080p/720p/480p/360p (solo las menores), con CRF y tope de bitrate
 #   por resolución (VID-08, scripts/hls-ladder.mjs)
 # - Keyframe cada 6 s exactos y sin cortes por escena -> segmentos de 6 s alineados entre calidades
-# - Audio copiado sin recodificar (no pierde calidad); con varios idiomas, cada uno es una pista aparte
-#   (VID-11) y los subtítulos de texto pasan a WebVTT apagados por defecto (VID-12, scripts/hls-tracks.mjs)
+# - Audio AAC copiado sin recodificar (no pierde calidad); otro códec (AC-3, E-AC-3, DTS, Opus…) se
+#   convierte a AAC estéreo porque los navegadores no lo reproducen (VID-13); con varios idiomas, cada
+#   uno es una pista aparte (VID-11) y los subtítulos de texto pasan a WebVTT apagados por defecto (VID-12, scripts/hls-tracks.mjs)
 # - [segundos] opcional: codifica solo ese tramo (para pruebas rápidas)
 set -euo pipefail
 
@@ -31,6 +32,13 @@ done < <(node "$(dirname "$0")/hls-ladder.mjs" "$WIDTH")
 N=${#WIDTHS[@]}
 # Pistas de audio: con más de una, van aparte y cada calidad es solo video (VID-11)
 AUDIOS=$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$IN" | grep -c . || true)
+# Códec de cada pista de audio: solo AAC se copia (VID-13)
+ACODECS=($(ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "$IN" | tr -d ','))
+AUDIO_ARGS=()
+audio_codec() { # <salida> <pista del original>
+  if [[ "${ACODECS[$2]:-}" == aac ]]; then AUDIO_ARGS+=("-c:a:$1" copy)
+  else AUDIO_ARGS+=("-c:a:$1" aac "-b:a:$1" 192k "-ac:a:$1" 2); fi
+}
 
 FILTER="[0:v]split=$N$(for i in $(seq 0 $((N-1))); do printf '[s%d]' "$i"; done)"
 MAPS=() RATES=() STREAM_MAP=""
@@ -43,6 +51,7 @@ for i in $(seq 0 $((N-1))); do
     STREAM_MAP+="v:$i,agroup:audio,name:${NAMES[$i]} "
   else
     MAPS+=(-map "[o$i]" -map 0:a:0)
+    if (( AUDIOS == 1 )); then audio_codec "$i" 0; fi
     STREAM_MAP+="v:$i,a:$i,name:${NAMES[$i]} "
   fi
 done
@@ -50,6 +59,7 @@ if (( AUDIOS > 1 )); then
   AUDIO_MAP=""
   for a in $(seq 0 $((AUDIOS-1))); do
     MAPS+=(-map "0:a:$a")
+    audio_codec "$a" "$a"
     AUDIO_MAP+="a:$a,agroup:audio,name:audio-$a"
     if (( a == 0 )); then AUDIO_MAP+=",default:yes"; fi
     AUDIO_MAP+=" "
@@ -65,7 +75,7 @@ ffmpeg -hide_banner -nostdin -y ${LIMIT:+-t "$LIMIT"} -i "$IN" \
   -c:v libx264 -preset "$PRESET" -profile:v high -pix_fmt yuv420p \
   -x264-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0:open-gop=0" \
   "${RATES[@]}" \
-  -c:a copy \
+  ${AUDIO_ARGS[@]+"${AUDIO_ARGS[@]}"} \
   -f hls -hls_time "$SEGMENT" -hls_playlist_type vod -hls_flags independent_segments \
   -hls_segment_filename "$OUT/%v/seg_%05d.ts" \
   -master_pl_name master.m3u8 \

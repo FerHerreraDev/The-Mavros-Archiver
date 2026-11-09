@@ -84,6 +84,16 @@ describe('validateLadder', () => {
     expect(validateLadder(variants, goodMedias(), source).some((e) => e.includes('sin CODECS'))).toBe(true)
   })
 
+  it('VID-13 audio AC-3 o E-AC-3 en CODECS → error; H.264 + AAC → bien', () => {
+    expect(validateLadder(parseMaster(MASTER), goodMedias(), source).some((e) => e.startsWith('VID-13'))).toBe(false)
+    const ac3 = parseMaster(MASTER.replace('avc1.640028,mp4a.40.2', 'avc1.640028,ac-3').replace('avc1.64001f,mp4a.40.2', 'avc1.64001f,ec-3'))
+    const errors = validateLadder(ac3, goodMedias(), source).filter((e) => e.startsWith('VID-13'))
+    expect(errors).toEqual([
+      'VID-13 1080p/index.m3u8 usa códecs que los navegadores no reproducen: ac-3',
+      'VID-13 720p/index.m3u8 usa códecs que los navegadores no reproducen: ec-3',
+    ])
+  })
+
   it('VID-01 dos calidades con la misma playlist (original entre escalones) → error', () => {
     const variants = parseMaster(MASTER.replace('1080p/index.m3u8', '720p/index.m3u8'))
     expect(validateLadder(variants, goodMedias(), source)).toContain('VID-01 hay calidades que apuntan a la misma playlist')
